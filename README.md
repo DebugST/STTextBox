@@ -10,8 +10,8 @@ We adopt the MIT open source license, and the code is built with .Net3.5 + vs201
 so it is compatible with almost all VS versions.
 Two open source projects were also generated during the design process:
 
-    [emoji-svg-render](https://github.com/DebugST/emoji-svg-render)
-    [STGraphemeSplitter](https://github.com/DebugST/STGraphemeSplitter)
+[emoji-svg-render](https://github.com/DebugST/emoji-svg-render), 
+[STGraphemeSplitter](https://github.com/DebugST/STGraphemeSplitter)
     
 Because of our limited capabilities, many functions are not well implemented, 
 so we modified the core functions into independent interfaces,
@@ -29,6 +29,6 @@ In `STTextBox` all the color you can use `alpha`, Of course his efficiency is al
 
 ![Style](https://s3.bmp.ovh/imgs/2022/08/01/d18e93176e4a4e48.png)
 
-You can also customize text styles, by implementing the `ITextStyleMonitor` interface, we have three realities built in.
-`KeyWorldStyleMonitor``CSharpStyleMonitor``LinkStyleMonitor`.
+You can also customize text styles, by implementing the `ITextStyleMonitor` interface, we have four realities built in.
+`KeyWorldStyleMonitor` `CSharpStyleMonitor` `LinkStyleMonitor` `SelectionStyleMonitor`.
 
