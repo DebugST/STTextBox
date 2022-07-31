@@ -1,0 +1,167 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{F0BD32C7-470F-446A-8771-E2E2D6E0AB1F}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>STTextBoxTest</RootNamespace>
+    <AssemblyName>STTextBoxTest</AssemblyName>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile>Client</TargetFrameworkProfile>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
+    <PlatformTarget>x86</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x86' ">
+    <PlatformTarget>x86</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Deployment" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Demos\FrmAbout.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Demos\FrmAbout.Designer.cs">
+      <DependentUpon>FrmAbout.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Demos\FrmAlpha.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Demos\FrmAlpha.Designer.cs">
+      <DependentUpon>FrmAlpha.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Demos\FrmCore.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Demos\FrmCore.Designer.cs">
+      <DependentUpon>FrmCore.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Demos\FrmEmoji.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Demos\FrmEmoji.Designer.cs">
+      <DependentUpon>FrmEmoji.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Demos\FrmInvisableChar.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Demos\FrmInvisableChar.Designer.cs">
+      <DependentUpon>FrmInvisableChar.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Demos\FrmNoWrapView.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Demos\FrmNoWrapView.Designer.cs">
+      <DependentUpon>FrmNoWrapView.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Demos\FrmSingleView.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Demos\FrmSingleView.Designer.cs">
+      <DependentUpon>FrmSingleView.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Demos\FrmStyle.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Demos\FrmStyle.Designer.cs">
+      <DependentUpon>FrmStyle.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Demos\FrmWrapView.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Demos\FrmWrapView.Designer.cs">
+      <DependentUpon>FrmWrapView.cs</DependentUpon>
+    </Compile>
+    <Compile Include="FrmDemo.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FrmDemo.Designer.cs">
+      <DependentUpon>FrmDemo.cs</DependentUpon>
+    </Compile>
+    <Compile Include="FrmTextBoundaryTest.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FrmTextBoundaryTest.Designer.cs">
+      <DependentUpon>FrmTextBoundaryTest.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Program.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <EmbeddedResource Include="Demos\FrmSingleView.resx">
+      <DependentUpon>FrmSingleView.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Demos\FrmWrapView.resx">
+      <DependentUpon>FrmWrapView.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="FrmDemo.resx">
+      <DependentUpon>FrmDemo.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="FrmTextBoundaryTest.resx">
+      <DependentUpon>FrmTextBoundaryTest.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+      <DesignTime>True</DesignTime>
+    </Compile>
+    <None Include="app.config" />
+    <None Include="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+    <Compile Include="Properties\Settings.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ST.Library.Drawing\ST.Library.Drawing.csproj">
+      <Project>{9D106212-8DD0-46D1-AC7B-FC8C78B71686}</Project>
+      <Name>ST.Library.Drawing</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\ST.Library.UI.STTextBox\ST.Library.UI.STTextBox.csproj">
+      <Project>{429ED407-C992-467B-AFE2-EDA3206ACFFB}</Project>
+      <Name>ST.Library.UI.STTextBox</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

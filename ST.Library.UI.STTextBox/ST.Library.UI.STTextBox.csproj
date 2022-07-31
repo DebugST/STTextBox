@@ -1,0 +1,97 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{429ED407-C992-467B-AFE2-EDA3206ACFFB}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>ST.Library.UI.STTextBox</RootNamespace>
+    <AssemblyName>ST.Library.UI.STTextBox</AssemblyName>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile>Client</TargetFrameworkProfile>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Implementation\StyleMonitor\CSharpStyleMonitor.cs" />
+    <Compile Include="Implementation\StyleMonitor\KeyWordStyleMonitor.cs" />
+    <Compile Include="Implementation\StyleMonitor\LinkStyleMonitor.cs" />
+    <Compile Include="Implementation\StyleMonitor\SelectionStyleMonitor.cs" />
+    <Compile Include="Implementation\STTextBoxGDIPRender.cs" />
+    <Compile Include="Implementation\TextHistory.cs" />
+    <Compile Include="Implementation\TextView\NoWrapTextView.cs" />
+    <Compile Include="Implementation\TextStyleMonitor.cs" />
+    <Compile Include="Implementation\TextView\SingleTextView.cs" />
+    <Compile Include="Implementation\TextView\TextView.cs" />
+    <Compile Include="Implementation\TextView\WrapTextView.cs" />
+    <Compile Include="Interface\IEmojiRender.cs" />
+    <Compile Include="Interface\ISTTextBoxRender.cs" />
+    <Compile Include="Interface\ITextView.cs" />
+    <Compile Include="STTextBox.Interface.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="STTextBox.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="DataType\FindInfo.cs" />
+    <Compile Include="DataType\STTextBoxCaretInfo.cs" />
+    <Compile Include="DataType\STTextBoxScrollInfo.cs" />
+    <Compile Include="DataType\STTextBoxSelectionInfo.cs" />
+    <Compile Include="TextManager\EventObject.cs" />
+    <Compile Include="TextManager\TextHistoryRecord.cs" />
+    <Compile Include="DataType\TextStyle.cs" />
+    <Compile Include="Implementation\GraphemeSplitter.cs" />
+    <Compile Include="Implementation\TextBoundary.cs" />
+    <Compile Include="Implementation\WordSplitter.cs" />
+    <Compile Include="Interface\ITextBoundary.cs" />
+    <Compile Include="Interface\ITextHistory.cs" />
+    <Compile Include="Interface\ITextStyleMonitor.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="STTextBox.KeyEvent.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="STTextBox.MouseEvent.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="TextManager\TextLine.cs" />
+    <Compile Include="TextManager\TextManager.cs" />
+    <Compile Include="Win32.cs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
