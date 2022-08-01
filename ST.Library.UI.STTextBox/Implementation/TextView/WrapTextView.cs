@@ -401,7 +401,7 @@ namespace ST.Library.UI.STTextBox
                 fi.Location = new Point((int)nX + base.TextRectangle.X + subLine.X, base.TextRectangle.Y + nYOffset * c.LineHeight);
             }
             fi.Find = true;
-            Console.WriteLine("->>>>>>>>>>>>>>>>>>>>>" + line.RawString.Substring(subLine.Index, subLine.Length) + " -- " + fi.IndexOfChar);
+            //Console.WriteLine("->>>>>>>>>>>>>>>>>>>>>" + line.RawString.Substring(subLine.Index, subLine.Length) + " -- " + fi.IndexOfChar);
             return fi;
         }
 

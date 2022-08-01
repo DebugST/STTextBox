@@ -185,32 +185,32 @@ namespace ST.Library.UI.STTextBox
 
         protected override void OnPaint(PaintEventArgs e) {
             base.OnPaint(e);
-            System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
-            sw.Start();
+            //System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
+            //sw.Start();
             this.XDPIZoom = e.Graphics.DpiX / 96;
             this.YDPIZoom = e.Graphics.DpiY / 96;
             var render = m_core.ITextBoxRender;
-            try {
-                render.OnBeginPaint(e.Graphics);
-                m_core.ITextView.OnDrawView(render);
-                if (this._AllowScrollBar && m_core.Scroll.CountDown != 0) {
-                    this.OnCalcScrollRectangle(m_core.Scroll);
-                    bool bFlag = true;
-                    if (m_core.Scroll.HBackRect != m_core.Scroll.HThumbRect) {
-                        this.OnDrawHScrollBar(render, m_core.Scroll);
-                    } else { bFlag = false; }
-                    if (m_core.Scroll.VBackRect != m_core.Scroll.VThumbRect) {
-                        this.OnDrawVScrollBar(render, m_core.Scroll);
-                    } else { bFlag = false; }
-                    if (bFlag) this.OnDrawScrollBarCorner(render, m_core.Scroll);
-                }
-                this.OnDrawBorder(render);
-                render.OnEndPaint(e.Graphics);
-            } catch (Exception ex) {
-                MessageBox.Show(ex.Message + "\r\n\r\n" + ex.StackTrace);
+            //try {
+            render.OnBeginPaint(e.Graphics);
+            m_core.ITextView.OnDrawView(render);
+            if (this._AllowScrollBar && m_core.Scroll.CountDown != 0) {
+                this.OnCalcScrollRectangle(m_core.Scroll);
+                bool bFlag = true;
+                if (m_core.Scroll.HBackRect != m_core.Scroll.HThumbRect) {
+                    this.OnDrawHScrollBar(render, m_core.Scroll);
+                } else { bFlag = false; }
+                if (m_core.Scroll.VBackRect != m_core.Scroll.VThumbRect) {
+                    this.OnDrawVScrollBar(render, m_core.Scroll);
+                } else { bFlag = false; }
+                if (bFlag) this.OnDrawScrollBarCorner(render, m_core.Scroll);
             }
-            sw.Stop();
-            Console.WriteLine("OnPaint - " + sw.ElapsedMilliseconds + "ms");
+            this.OnDrawBorder(render);
+            render.OnEndPaint(e.Graphics);
+            //} catch (Exception ex) {
+            //    MessageBox.Show(ex.Message + "\r\n\r\n" + ex.StackTrace);
+            //}
+            //sw.Stop();
+            //Console.WriteLine("OnPaint - " + sw.ElapsedMilliseconds + "ms");
         }
 
         protected virtual void OnDrawBorder(ISTTextBoxRender render) {
@@ -337,6 +337,15 @@ namespace ST.Library.UI.STTextBox
             var histories = isUndo ? c.ITextHistory.GetUndo() : c.ITextHistory.GetRedo();
             if (histories == null || histories.Length == 0) {
                 return;
+            }
+            if (isUndo) {
+                var temp = new TextHistoryRecord[histories.Length];
+                for (int i = 0; i < histories.Length; i++) {
+                    temp[i] = histories[i];
+                    temp[i].NewText = histories[i].OldText;
+                    temp[i].OldText = histories[i].NewText;
+                }
+                histories = temp;
             }
             histories = c.TextManager.RunHistory(histories);
             var last = histories[histories.Length - 1];

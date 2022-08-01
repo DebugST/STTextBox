@@ -225,7 +225,6 @@ namespace ST.Library.UI.STTextBox
             int nCurrentCharIndex = line.IndexOfFirstChar + nIndexEach;
 
             bool bIsEmoji = false;
-            TextStyleRange tsi = TextStyleRange.Empty;
             c.IGraphemeSplitter.Each(line.RawString, nIndexEach, (str, nStart, nLen) => {
                 string strChar = str.Substring(nStart, nLen);
                 if (c.IsEmoji(strChar)) {

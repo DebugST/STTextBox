@@ -79,8 +79,8 @@ namespace ST.Library.UI.STTextBox
                     return;
             }
             if (e.Button == System.Windows.Forms.MouseButtons.Left) {
-                var sw = new System.Diagnostics.Stopwatch();
-                sw.Start();
+                //var sw = new System.Diagnostics.Stopwatch();
+                //sw.Start();
                 var fi = c.ITextView.FindFromPoint(e.Location);
                 if (!fi.Find) return;
                 c.Caret.CopyFromFindInfo(fi);
@@ -97,8 +97,8 @@ namespace ST.Library.UI.STTextBox
                 c.Selection.SetSelection(c.Selection.AnchorIndex, nIndex);
                 c.ITextView.SetCaretPostion(fi.IndexOfChar);
                 c.ITextView.ScrollToCaret();
-                sw.Stop();
-                Console.WriteLine("CheckSelection: - " + sw.ElapsedMilliseconds);
+                //sw.Stop();
+                //Console.WriteLine("CheckSelection: - " + sw.ElapsedMilliseconds);
                 this.Invalidate();
                 return;
             }
@@ -141,7 +141,7 @@ namespace ST.Library.UI.STTextBox
         protected override void OnMouseWheel(MouseEventArgs e) {
             base.OnMouseWheel(e);
             DateTime dt_now = DateTime.Now;
-            Console.WriteLine("Scroll: --------------------- " + dt_now.Subtract(m_dt_last_scroll_v).TotalMilliseconds);
+            //Console.WriteLine("Scroll: --------------------- " + dt_now.Subtract(m_dt_last_scroll_v).TotalMilliseconds);
             int nIncrement = 1;
             int nTemp = (int)dt_now.Subtract(m_dt_last_scroll_v).TotalMilliseconds;
             foreach (var v in m_arr_si) {
@@ -178,7 +178,7 @@ namespace ST.Library.UI.STTextBox
 
         protected virtual void OnMouseHWheel(MouseEventArgs e) {
             DateTime dt_now = DateTime.Now;
-            Console.WriteLine("Scroll: --------------------- " + dt_now.Subtract(m_dt_last_scroll_h).TotalMilliseconds);
+            //Console.WriteLine("Scroll: --------------------- " + dt_now.Subtract(m_dt_last_scroll_h).TotalMilliseconds);
             int nIncrement = 1;
             int nTemp = (int)dt_now.Subtract(m_dt_last_scroll_h).TotalMilliseconds;
             foreach (var v in m_arr_si) {
