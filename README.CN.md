@@ -31,3 +31,8 @@
 为了让颜色可以使用`Alpha`通道，所以我们并没有对绘制的内容做缓存处理，因为背景可能是变化的。而且要做缓存也是一个麻烦事情。
 所以我们暂时没有考虑极端情况的渲染速度。
 
+# 关于作者
+* Github: [DebugST](https://github.com/DebugST/)
+* Blog: [Crystal_lz](http://st233.com)
+* Mail: (2212233137@qq.com)
+* TG: [DebugST](t.me/DebugST)

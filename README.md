@@ -41,3 +41,8 @@ In order for the colors to use the `Alpha` channel, we don't cache what's being 
 since the background may change. And doing caching is also a hassle.
 So we have not considered the rendering speed of extreme cases for the time being.
 
+# About Author
+* Github: [DebugST](https://github.com/DebugST/)
+* Blog: [Crystal_lz](http://st233.com)
+* Mail: (2212233137@qq.com)
+* TG: [DebugST](t.me/DebugST)
