@@ -41,10 +41,14 @@ namespace ST.Library.UI.STTextBox
                 }
                 return false;
             });
-            if (!string.IsNullOrEmpty(strKey))  {
+            if (!string.IsNullOrEmpty(strKey)) {
                 string strText = textManager.GetText();
                 List<TextStyleRange> lst = new List<TextStyleRange>();
-                foreach (Match m in Regex.Matches(strText, "\\b" + strKey + "\\b")) {
+                if ("* . ? + $ ^ [ ] ( ) { } | \\ /".Split(' ').Contains(strKey))
+                {
+                    strKey = "\\" + strKey;
+                }
+                foreach (Match m in Regex.Matches(strText, "\\b" + strKey + "\\b")) { // * . ? + $ ^ [ ] ( ) { } | \ /
                     lst.Add(new TextStyleRange() {
                         Index = m.Index,
                         Length = m.Length,
