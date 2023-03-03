@@ -44,26 +44,23 @@ namespace ST.Library.UI.STTextBox
             });
 
             // https://github.com/DebugST/STTextBox/pull/1
-            //if ("* . ? + $ ^ [ ] ( ) { } | \\ /".Split(' ').Contains(strKey)) {
-            //    strKey = "\\" + strKey;
-            //}
+            // if ("* . ? + $ ^ [ ] ( ) { } | \\ /".Split(' ').Contains(strKey)) {
+            //     strKey = "\\" + strKey;
+            // }
             strKey = m_reg_reg.Replace(strKey, @"\$1");
-            if (!string.IsNullOrEmpty(strKey)) {
-                string strText = textManager.GetText();
-                List<TextStyleRange> lst = new List<TextStyleRange>();
-                if ("* . ? + $ ^ [ ] ( ) { } | \\ /".Split(' ').Contains(strKey))
-                {
-                    strKey = "\\" + strKey;
-                }
-                foreach (Match m in Regex.Matches(strText, "\\b" + strKey + "\\b")) { // * . ? + $ ^ [ ] ( ) { } | \ /
-                    lst.Add(new TextStyleRange() {
-                        Index = m.Index,
-                        Length = m.Length,
-                        Style = this.Style
-                    });
-                }
-                m_lst = TextStyleMonitor.FillDefaultStyle(lst, strText.Length, TextStyle.Empty);
+            if (string.IsNullOrEmpty(strKey)) {
+                return;
             }
+            string strText = textManager.GetText();
+            List<TextStyleRange> lst = new List<TextStyleRange>();
+            foreach (Match m in Regex.Matches(strText, "\\b" + strKey + "\\b")) {
+                lst.Add(new TextStyleRange() {
+                    Index = m.Index,
+                    Length = m.Length,
+                    Style = this.Style
+                });
+            }
+            m_lst = TextStyleMonitor.FillDefaultStyle(lst, strText.Length, TextStyle.Empty);
         }
 
         public void OnTextChanged(TextManager textManager, List<TextHistoryRecord> thrs) {
