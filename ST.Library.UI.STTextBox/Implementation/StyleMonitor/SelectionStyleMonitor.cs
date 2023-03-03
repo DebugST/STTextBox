@@ -13,6 +13,7 @@ namespace ST.Library.UI.STTextBox
 
         private static WordSplitter m_spliter = new WordSplitter();
         private List<TextStyleRange> m_lst = new List<TextStyleRange>();
+        private Regex m_reg_reg = new Regex(@"([*.?+$^\[\](){}|\\])");
 
         public SelectionStyleMonitor() {
             this.Style = new TextStyle() {
@@ -41,7 +42,12 @@ namespace ST.Library.UI.STTextBox
                 }
                 return false;
             });
-            if (!string.IsNullOrEmpty(strKey))  {
+            // https://github.com/DebugST/STTextBox/pull/1
+            //if ("* . ? + $ ^ [ ] ( ) { } | \\ /".Split(' ').Contains(strKey)) {
+            //    strKey = "\\" + strKey;
+            //}
+            strKey = m_reg_reg.Replace(strKey, @"\$1");
+            if (!string.IsNullOrEmpty(strKey)) {
                 string strText = textManager.GetText();
                 List<TextStyleRange> lst = new List<TextStyleRange>();
                 foreach (Match m in Regex.Matches(strText, "\\b" + strKey + "\\b")) {

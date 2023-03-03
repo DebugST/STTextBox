@@ -464,6 +464,7 @@ namespace ST.Library.UI.STTextBox
                 ptCurrentPos = m_core.Caret.Location
             };
             Win32.ImmSetCandidateWindow(hIMC, ref CandidateForm);
+
             var CompositionForm = new Win32.COMPOSITIONFORM() {
                 dwStyle = Win32.CFS_FORCE_POSITION,
                 ptCurrentPos = m_core.Caret.Location
