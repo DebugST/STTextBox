@@ -6,7 +6,7 @@
 # STTextBox
 STTextBox is a pure GDI-drawn WinForm control, which can support transparent colors and Emoji, etc., and can customize the display style of text through the text style monitor.
 
-STTextBox is a WinForm control drawn by me and my friend [netero](https://github.com/0x54164) using GDI.
+STTextBox is a WinForm control drawn by me and my friend [tpbeldie](https://github.com/tpbeldie) using GDI.
 
 We adopt the MIT open source license, and the code is built with .Net3.5 + vs2010, 
 so it is compatible with almost all VS versions.
