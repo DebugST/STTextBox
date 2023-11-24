@@ -2,7 +2,7 @@
 [![LICENSE](https://img.shields.io/badge/License-MIT-green)](https://github.com/DebugST/STNodeEditor/blob/main/LICENSE)
 
 # STTextBox
-`STTextBox`是我和我的朋友[netero](https://github.com/0x54164)使用`GDI`构建的一个`WinForm`控件，可以支持`Emoji`
+`STTextBox`是我和我的朋友[tpbeldie](https://github.com/tpbeldie)使用`GDI`构建的一个`WinForm`控件，可以支持`Emoji`
 
 我们采用MIT开源协议，使用`.Net3.5` + `vs2010`构建的项目，所以几乎可以兼容任何VS版本，
 在开发的过程中我们还衍生出两个额外的开源项目：
