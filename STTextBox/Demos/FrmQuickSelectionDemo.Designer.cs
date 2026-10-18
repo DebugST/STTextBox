@@ -16,7 +16,7 @@ namespace STTextBoxTest.Demos
         private void InitializeComponent() {
             this.components = new System.ComponentModel.Container();
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1040, 680);
+            this.ClientSize = new System.Drawing.Size(1260, 720);
             this.Text = "QuickTextbox High-Performance Selection Demo";
         }
 

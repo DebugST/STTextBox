@@ -44,6 +44,7 @@ namespace STTextBoxTest.Demos
             int endChar = 9 * 122 + 75;
             // Set selection on STTextBox
             SelectRange(startChar, endChar);
+            UpdateStatus();
         }
 
         private void SetupControls() {
@@ -62,6 +63,9 @@ namespace STTextBoxTest.Demos
 
             toolStrip.Items.Add(new ToolStripLabel("Size:"));
             m_cboSize = new ToolStripComboBox();
+            m_cboSize.AutoSize = false;
+            m_cboSize.Width = 150;
+            m_cboSize.DropDownWidth = 320;
             m_cboSize.DropDownStyle = ComboBoxStyle.DropDownList;
             m_cboSize.Items.AddRange(new object[] {
                 "60 lines x 120 chars (ASCII Prototype Default)",
@@ -82,6 +86,9 @@ namespace STTextBoxTest.Demos
 
             toolStrip.Items.Add(new ToolStripLabel("Font:"));
             m_cboFont = new ToolStripComboBox();
+            m_cboFont.AutoSize = false;
+            m_cboFont.Width = 180;
+            m_cboFont.DropDownWidth = 260;
             m_cboFont.DropDownStyle = ComboBoxStyle.DropDownList;
             m_cboFont.Items.AddRange(new object[] {
                 "Segoe UI (10.5 pt) - Proportional",
@@ -101,6 +108,9 @@ namespace STTextBoxTest.Demos
 
             toolStrip.Items.Add(new ToolStripLabel("Renderer:"));
             m_cboRenderer = new ToolStripComboBox();
+            m_cboRenderer.AutoSize = false;
+            m_cboRenderer.Width = 160;
+            m_cboRenderer.DropDownWidth = 200;
             m_cboRenderer.DropDownStyle = ComboBoxStyle.DropDownList;
             m_cboRenderer.Items.AddRange(new object[] {
                 "GDI (Fast TextRenderer)",
@@ -114,6 +124,9 @@ namespace STTextBoxTest.Demos
 
             toolStrip.Items.Add(new ToolStripLabel("View:"));
             m_cboView = new ToolStripComboBox();
+            m_cboView.AutoSize = false;
+            m_cboView.Width = 180;
+            m_cboView.DropDownWidth = 260;
             m_cboView.DropDownStyle = ComboBoxStyle.DropDownList;
             m_cboView.Items.AddRange(new object[] {
                 "QuickTextView (Cached & Chunk Drawing)",
@@ -129,6 +142,9 @@ namespace STTextBoxTest.Demos
 
             toolStrip.Items.Add(new ToolStripLabel("Alignment:"));
             m_cboAlignment = new ToolStripComboBox();
+            m_cboAlignment.AutoSize = false;
+            m_cboAlignment.Width = 65;
+            m_cboAlignment.DropDownWidth = 80;
             m_cboAlignment.DropDownStyle = ComboBoxStyle.DropDownList;
             m_cboAlignment.Items.AddRange(new object[] {
                 "Left",
@@ -144,6 +160,9 @@ namespace STTextBoxTest.Demos
 
             toolStrip.Items.Add(new ToolStripLabel("Theme:"));
             m_cboTheme = new ToolStripComboBox();
+            m_cboTheme.AutoSize = false;
+            m_cboTheme.Width = 160;
+            m_cboTheme.DropDownWidth = 220;
             m_cboTheme.DropDownStyle = ComboBoxStyle.DropDownList;
             m_cboTheme.Items.AddRange(new object[] {
                 "Windows Accent (Blue / White)",
