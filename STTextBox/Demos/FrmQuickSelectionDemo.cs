@@ -61,10 +61,13 @@ namespace STTextBoxTest.Demos
             m_cboSize = new ToolStripComboBox();
             m_cboSize.DropDownStyle = ComboBoxStyle.DropDownList;
             m_cboSize.Items.AddRange(new object[] {
-                "60 lines x 120 chars (Prototype Default)",
-                "150 lines x 120 chars",
-                "300 lines x 140 chars",
-                "1000 lines x 120 chars"
+                "60 lines x 120 chars (ASCII Prototype Default)",
+                "150 lines x 120 chars (ASCII)",
+                "300 lines x 140 chars (ASCII)",
+                "1000 lines x 120 chars (ASCII)",
+                "60 lines x 50 chars (Chinese / 中文)",
+                "300 lines x 50 chars (Chinese / 中文)",
+                "100 lines (Mixed English & Chinese / 中英混合)"
             });
             m_cboSize.SelectedIndex = 0;
             m_cboSize.SelectedIndexChanged += (s, ev) => OnRegenerateClicked();
@@ -154,13 +157,21 @@ namespace STTextBoxTest.Demos
         private void OnRegenerateClicked() {
             int lines = 60;
             int cols = 120;
-            switch (m_cboSize.SelectedIndex) {
+            int mode = m_cboSize.SelectedIndex;
+            switch (mode) {
                 case 0: lines = 60; cols = 120; break;
                 case 1: lines = 150; cols = 120; break;
                 case 2: lines = 300; cols = 140; break;
                 case 3: lines = 1000; cols = 120; break;
+                case 4: lines = 60; cols = 50; break;
+                case 5: lines = 300; cols = 50; break;
+                case 6: lines = 100; cols = 80; break;
             }
-            PopulateDummyText(lines, cols);
+            if (mode >= 4) {
+                PopulateChineseText(lines, cols, mode == 6);
+            } else {
+                PopulateDummyText(lines, cols);
+            }
             UpdateStatus();
         }
 
@@ -221,6 +232,41 @@ namespace STTextBoxTest.Demos
                     line_chars[j] = char_set[rand_index];
                 }
                 s.AppendLine(new string(line_chars));
+            }
+            m_tbx.SetText(s.ToString());
+        }
+
+        private void PopulateChineseText(int lines, int lineLength, bool mixed) {
+            StringBuilder s = new StringBuilder();
+            Random r = new Random(42);
+            string cjkChars = "的一是在不了有和人这中大为上个国我以要他时来用们生到作地于出就分对成会可主发年动同工也能下过子说产种面而方后多定行学法所民得经十三之进着等部度家电力里如水化高自二理起小物现实加量都两体制机当使点从业本去把性好应开它天地玄黄宇宙洪荒日月盈昃辰宿列张寒来暑往秋收冬藏闰余成岁律吕调阳云腾致雨露结为霜金生丽水玉出昆冈剑号巨阙珠称夜光";
+            string asciiChars = "abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*() ";
+            for (int i = 0; i < lines; i++) {
+                if (mixed) {
+                    StringBuilder line = new StringBuilder();
+                    line.Append(string.Format("{0}. ", i + 1));
+                    while (line.Length < lineLength) {
+                        if (r.Next(2) == 0) {
+                            int phraseLen = r.Next(2, 6);
+                            for (int p = 0; p < phraseLen && line.Length < lineLength; p++) {
+                                line.Append(cjkChars[r.Next(cjkChars.Length)]);
+                            }
+                        } else {
+                            int wordLen = r.Next(3, 8);
+                            for (int w = 0; w < wordLen && line.Length < lineLength; w++) {
+                                line.Append(asciiChars[r.Next(asciiChars.Length)]);
+                            }
+                            line.Append(' ');
+                        }
+                    }
+                    s.AppendLine(line.ToString());
+                } else {
+                    char[] line_chars = new char[lineLength];
+                    for (int j = 0; j < lineLength; j++) {
+                        line_chars[j] = cjkChars[r.Next(cjkChars.Length)];
+                    }
+                    s.AppendLine(new string(line_chars));
+                }
             }
             m_tbx.SetText(s.ToString());
         }

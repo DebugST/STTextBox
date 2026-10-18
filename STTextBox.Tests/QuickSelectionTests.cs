@@ -185,5 +185,45 @@ namespace STTextBox.Tests
                 Assert.Equal(20, fiHit.IndexOfCharInLine);
             }
         }
+
+        [Fact]
+        public void QuickTextView_WithChineseCharacters_HitTestsAndMeasuresAccurately()
+        {
+            using (var tbx = new ST.Library.UI.STTextBox.STTextBox()) {
+                var view = new QuickTextView();
+                tbx.SetTextView(view);
+                tbx.Font = new Font("Consolas", 10.5f);
+
+                string chineseLine = "中文测试：Hello World! 快速选择。";
+                tbx.SetText(chineseLine);
+
+                // Caret at char index 4 (after "中文测试")
+                FindInfo fi4 = view.FindFromCharIndex(4);
+                Assert.True(fi4.Find);
+                Assert.Equal(4, fi4.IndexOfCharInLine);
+
+                // Hit testing back at that exact location should return column 4
+                FindInfo fiHit = view.FindFromPoint(fi4.Location);
+                Assert.True(fiHit.Find);
+                Assert.Equal(4, fiHit.IndexOfCharInLine);
+
+                // Verify line width is strictly positive and wider than pure ASCII 4 chars
+                Assert.True(fi4.Location.X > view.TextRectangle.Left);
+
+                // Ensure drawing with selection does not throw and paints without error
+                using (var render = new STTextBoxGDIPRender()) {
+                    tbx.SetTextBoxRender(render);
+                    using (var bmp = new Bitmap(500, 50))
+                    using (var g = Graphics.FromImage(bmp)) {
+                        tbx.SelectionColor = Color.FromArgb(0, 120, 215);
+                        tbx.SelectedTextColor = Color.White;
+                        tbx.Select(2, 6);
+                        render.OnBeginPaint(g);
+                        view.OnDrawView(render);
+                        render.OnEndPaint(g);
+                    }
+                }
+            }
+        }
     }
 }

@@ -282,7 +282,21 @@ namespace ST.Library.UI.STTextBox
             float monoAdvance = c.ITextBoxRender.CharWidthFloat;
             bool isMono = c.ITextBoxRender.IsMonospaced && monoAdvance > 0f;
 
-            if (isMono && text.IndexOf('\t') < 0) {
+            // Fast ASCII check: if all characters are regular ASCII, we can use fast mono advance
+            bool isPureAsciiNoTabs = isMono;
+            if (isPureAsciiNoTabs) {
+                for (int i = 0; i < text.Length; i++) {
+                    char ch = text[i];
+                    if (ch < 32 || ch > 126) {
+                        if (ch != '\r' && ch != '\n') {
+                            isPureAsciiNoTabs = false;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (isPureAsciiNoTabs) {
                 for (int i = 0; i < text.Length; i++) {
                     char ch = text[i];
                     if (ch == '\r' || ch == '\n') {
@@ -293,28 +307,38 @@ namespace ST.Library.UI.STTextBox
                     }
                 }
             } else {
-                c.ITextBoxRender.BeginPaint();
-                try {
-                    for (int i = 0; i < text.Length; i++) {
-                        char ch = text[i];
-                        float w;
-                        if (ch == '\t') {
-                            w = c.GetStringWidthFloat("\t", TextStyle.Empty, currentWidth);
-                        } else if (ch == '\r' || ch == '\n') {
-                            w = 0f;
-                        } else if (isMono && ch >= 32 && ch <= 126) {
-                            w = monoAdvance;
-                        } else {
-                            if (!m_dic_char_widths.TryGetValue(ch, out w)) {
-                                w = c.GetStringWidthFloat(ch.ToString(), TextStyle.Empty, currentWidth);
-                                m_dic_char_widths[ch] = w;
-                            }
-                        }
-                        currentWidth += w;
+                for (int i = 0; i < text.Length; i++) {
+                    char ch = text[i];
+                    if (ch == '\r' || ch == '\n') {
                         widths[i + 1] = currentWidth;
+                        continue;
                     }
-                } finally {
-                    c.ITextBoxRender.EndPaint();
+                    if (char.IsHighSurrogate(ch) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1])) {
+                        string surrogateStr = text.Substring(i, 2);
+                        float sw;
+                        if (!m_dic_char_widths.TryGetValue(ch, out sw)) {
+                            sw = c.GetStringWidthFloat(surrogateStr, TextStyle.Empty, currentWidth);
+                            m_dic_char_widths[ch] = sw;
+                        }
+                        currentWidth += sw;
+                        widths[i + 1] = currentWidth;
+                        widths[i + 2] = currentWidth;
+                        i++;
+                        continue;
+                    }
+                    float w;
+                    if (isMono && ch >= 32 && ch <= 126) {
+                        w = monoAdvance;
+                    } else if (ch == '\t') {
+                        w = c.GetStringWidthFloat("\t", TextStyle.Empty, currentWidth);
+                    } else {
+                        if (!m_dic_char_widths.TryGetValue(ch, out w)) {
+                            w = c.GetStringWidthFloat(ch.ToString(), TextStyle.Empty, currentWidth);
+                            m_dic_char_widths[ch] = w;
+                        }
+                    }
+                    currentWidth += w;
+                    widths[i + 1] = currentWidth;
                 }
             }
             int intTotalWidth = (int)Math.Ceiling(currentWidth);
