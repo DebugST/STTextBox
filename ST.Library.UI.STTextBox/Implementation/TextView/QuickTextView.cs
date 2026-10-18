@@ -30,10 +30,14 @@ namespace ST.Library.UI.STTextBox
 
         public override void Init(STTextBox.Core core) {
             base.Init(core);
+            m_dic_line_widths.Clear();
+            m_dic_char_widths.Clear();
+            m_nMaxLineWidth = 0;
             if (core != null && core.TextBox != null) {
                 core.TextBox.FontChanged += (s, e) => {
                     m_dic_line_widths.Clear();
                     m_dic_char_widths.Clear();
+                    m_nMaxLineWidth = 0;
                 };
             }
         }

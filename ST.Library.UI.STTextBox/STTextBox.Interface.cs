@@ -98,6 +98,8 @@ namespace ST.Library.UI.STTextBox
                 this.ITextBoxRender = render;
                 if (this.ITextView != null) {
                     this.ITextView.Init(this);
+                    this.ITextView.OnCalcTextRectangle();
+                    this.ITextView.OnCalcScroll(this.Scroll);
                 }
                 this.TextBox.Invalidate();
                 return old;
@@ -239,6 +241,8 @@ namespace ST.Library.UI.STTextBox
             var old = m_core.ITextView;
             m_core.ITextView = textView;
             textView.Init(m_core);
+            textView.OnCalcTextRectangle();
+            textView.OnCalcScroll(m_core.Scroll);
             return old;
         }
 

@@ -290,5 +290,93 @@ namespace STTextBox.Tests
                 }
             }
         }
+
+        [Fact]
+        public void QuickTextView_PartialSelection_ChineseText_GDIPlus_EliminatesGlyphShifting()
+        {
+            using (var tbx = new ST.Library.UI.STTextBox.STTextBox()) {
+                var view = new QuickTextView();
+                tbx.SetTextView(view);
+                tbx.Font = new Font("Consolas", 10.5f);
+                tbx.SetBounds(0, 0, 800, 200);
+
+                var render = new STTextBoxGDIPRender();
+                tbx.SetTextBoxRender(render);
+
+                string content = "\u4e24\u628a\u81f4\u591a\u5b89\u6668\u9876\u671f\u989d\u4e00\u4e8c\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341";
+                tbx.SetText(content);
+
+                // 1. Render without selection
+                using (var bmpUnselected = new Bitmap(800, 100))
+                using (var g1 = Graphics.FromImage(bmpUnselected)) {
+                    g1.Clear(Color.White);
+                    render.OnBeginPaint(g1);
+                    view.OnDrawView(render);
+                    render.OnEndPaint(g1);
+
+                    // 2. Render with partial selection of Chinese characters (index 4 to 8)
+                    tbx.Select(4, 4);
+                    using (var bmpSelected = new Bitmap(800, 100))
+                    using (var g2 = Graphics.FromImage(bmpSelected)) {
+                        g2.Clear(Color.White);
+                        render.OnBeginPaint(g2);
+                        view.OnDrawView(render);
+                        render.OnEndPaint(g2);
+
+                        FindInfo fi4 = view.FindFromCharIndex(4);
+                        FindInfo fi8 = view.FindFromCharIndex(8);
+
+                        // Verify prefix region (characters 0..3): 0 pixel differences
+                        int prefixDiff = 0;
+                        int fontHeight = render.GetFontHeight();
+                        for (int y = view.TextRectangle.Top; y < view.TextRectangle.Top + fontHeight; y++) {
+                            for (int x = view.TextRectangle.Left; x < fi4.Location.X - 1; x++) {
+                                if (bmpUnselected.GetPixel(x, y).ToArgb() != bmpSelected.GetPixel(x, y).ToArgb()) {
+                                    prefixDiff++;
+                                }
+                            }
+                        }
+                        Assert.Equal(0, prefixDiff);
+
+                        // Verify suffix region (characters 8+): 0 pixel differences (zero glyph shift/jitter)
+                        int suffixDiff = 0;
+                        for (int y = view.TextRectangle.Top; y < view.TextRectangle.Top + fontHeight; y++) {
+                            for (int x = fi8.Location.X + 2; x < 600; x++) {
+                                if (bmpUnselected.GetPixel(x, y).ToArgb() != bmpSelected.GetPixel(x, y).ToArgb()) {
+                                    suffixDiff++;
+                                }
+                            }
+                        }
+                        Assert.Equal(0, suffixDiff);
+                    }
+                }
+            }
+        }
+
+        [Fact]
+        public void QuickTextView_SwitchingRenderer_ClearsCachedWidths()
+        {
+            using (var tbx = new ST.Library.UI.STTextBox.STTextBox()) {
+                var view = new QuickTextView();
+                tbx.SetTextView(view);
+                tbx.Font = new Font("Consolas", 10.5f);
+                tbx.SetBounds(0, 0, 500, 100);
+
+                var gdiRender = new STTextBoxGDIRender();
+                var gdipRender = new STTextBoxGDIPRender();
+
+                // 1. Start with GDI
+                tbx.SetTextBoxRender(gdiRender);
+                tbx.SetText("\u4e24\u628a\u81f4\u591a");
+                FindInfo fiGdi = view.FindFromCharIndex(2);
+
+                // 2. Switch to GDI+
+                tbx.SetTextBoxRender(gdipRender);
+                FindInfo fiGdip = view.FindFromCharIndex(2);
+
+                // GDI and GDI+ measure font fallback widths differently; verify cache was invalidated upon switch
+                Assert.NotEqual(fiGdi.Location.X, fiGdip.Location.X);
+            }
+        }
     }
 }
