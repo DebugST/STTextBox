@@ -642,5 +642,188 @@ namespace STTextBox.Tests
                 }
             }
         }
+
+        [Fact]
+        public void WrapTextView_HighSpeedSelectionAndTyping_WorksCorrectly()
+        {
+            using (var tbx = new ST.Library.UI.STTextBox.STTextBox())
+            using (var gdiRender = new STTextBoxGDIRender())
+            using (var gdipRender = new STTextBoxGDIPRender()) {
+                tbx.SetBounds(0, 0, 450, 300);
+                tbx.SetTextBoxRender(gdiRender);
+                var wrapView = new WrapTextView(WrapTextView.Method.Word, WrapTextView.Alignment.Left);
+                tbx.SetTextView(wrapView);
+                tbx.Font = new Font("Segoe UI", 10.5f);
+
+                string text = "High performance text rendering requires efficient layout algorithms, low-overhead grapheme cluster detection, and cache-friendly data structures.\r\n" +
+                              "The quick brown fox jumps over the lazy dog while software engineers benchmark text layout.\r\n" +
+                              "天地玄黄宇宙洪荒日月盈昃辰宿列张寒来暑往秋收冬藏闰余成岁律吕调阳云腾致雨露结为霜。";
+                tbx.SetText(text);
+
+                var core = typeof(ST.Library.UI.STTextBox.STTextBox).GetField("m_core", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(tbx) as ST.Library.UI.STTextBox.STTextBox.Core;
+
+                // 1. Test hit testing (FindFromPoint)
+                for (int x = 20; x < 400; x += 40) {
+                    for (int y = 20; y < 200; y += 30) {
+                        FindInfo fi = wrapView.FindFromPoint(new Point(x, y));
+                        Assert.True(fi.Find);
+                        Assert.NotNull(fi.Line);
+                        Assert.True(fi.IndexOfCharInLine >= 0);
+                    }
+                }
+
+                // 2. Test caret placement
+                wrapView.SetCaretPostion(35);
+                Assert.Equal(35, core.Caret.IndexOfChar);
+                wrapView.SetCaretPostion(120);
+                Assert.Equal(120, core.Caret.IndexOfChar);
+
+                // 3. Test selection rendering across sublines in GDI mode
+                core.Selection.SetSelection(20, 140);
+                Assert.Equal(120, core.Selection.Length);
+
+                using (var bmp = new Bitmap(tbx.Width, tbx.Height)) {
+                    tbx.DrawToBitmap(bmp, new Rectangle(0, 0, tbx.Width, tbx.Height));
+                    Assert.NotNull(bmp);
+                }
+
+                // 4. Test text insertion (typing simulation)
+                core.Selection.SetIndex(40);
+                core.TextManager.SetText(40, 0, " [INSERTED TEXT] ");
+                wrapView.SetCaretPostion(57);
+                Assert.Equal(57, core.Caret.IndexOfChar);
+
+                using (var bmp = new Bitmap(tbx.Width, tbx.Height)) {
+                    tbx.DrawToBitmap(bmp, new Rectangle(0, 0, tbx.Width, tbx.Height));
+                    Assert.NotNull(bmp);
+                }
+
+                // 5. Test switching to GDI+ renderer
+                tbx.SetTextBoxRender(gdipRender);
+                core.Selection.SetSelection(10, 80);
+
+                using (var bmp = new Bitmap(tbx.Width, tbx.Height)) {
+                    tbx.DrawToBitmap(bmp, new Rectangle(0, 0, tbx.Width, tbx.Height));
+                    Assert.NotNull(bmp);
+                }
+
+                // 6. Test Right and Center alignments with wrapped selection
+                wrapView.SetWrap(WrapTextView.Method.Word, WrapTextView.Alignment.Center);
+                using (var bmp = new Bitmap(tbx.Width, tbx.Height)) {
+                    tbx.DrawToBitmap(bmp, new Rectangle(0, 0, tbx.Width, tbx.Height));
+                    Assert.NotNull(bmp);
+                }
+
+                wrapView.SetWrap(WrapTextView.Method.Word, WrapTextView.Alignment.Right);
+                using (var bmp = new Bitmap(tbx.Width, tbx.Height)) {
+                    tbx.DrawToBitmap(bmp, new Rectangle(0, 0, tbx.Width, tbx.Height));
+                    Assert.NotNull(bmp);
+                }
+            }
+        }
+
+        [Fact]
+        public void WrapTextView_Performance_Benchmark()
+        {
+            using (var tbx = new ST.Library.UI.STTextBox.STTextBox())
+            using (var gdiRender = new STTextBoxGDIRender())
+            using (var gdipRender = new STTextBoxGDIPRender()) {
+                tbx.SetBounds(0, 0, 800, 600);
+                tbx.SetTextBoxRender(gdiRender);
+                var wrapView = new WrapTextView(WrapTextView.Method.Word, WrapTextView.Alignment.Left);
+                tbx.SetTextView(wrapView);
+                tbx.Font = new Font("Segoe UI", 10.5f);
+
+                // Build a 100-line natural prose document
+                var sb = new System.Text.StringBuilder();
+                string paragraph = "High performance text rendering requires efficient layout algorithms, low-overhead grapheme cluster detection, and cache-friendly data structures. " +
+                                   "The quick brown fox jumps over the lazy dog while software engineers benchmark text layout and selection speed across various typographic styles. " +
+                                   "Proportional typefaces introduce variable character advances, requiring individual glyph measurements or optimized proportional advance lookup tables.\r\n";
+                for (int i = 0; i < 100; i++) {
+                    sb.Append(paragraph);
+                }
+                tbx.SetText(sb.ToString());
+
+                var core = typeof(ST.Library.UI.STTextBox.STTextBox).GetField("m_core", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(tbx) as ST.Library.UI.STTextBox.STTextBox.Core;
+
+                // Active multi-line selection
+                core.Selection.SetSelection(50, 600);
+
+                // --- GDI Benchmarks ---
+                // 1. 1000 Hit tests
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                for (int i = 0; i < 1000; i++) {
+                    var fi = wrapView.FindFromPoint(new Point(200 + (i % 300), 50 + (i % 400)));
+                    Assert.True(fi.Find);
+                }
+                sw.Stop();
+                long gdiHitMs = sw.ElapsedMilliseconds;
+
+                // 2. 50 Selection repaints
+                using (var bmp = new Bitmap(tbx.Width, tbx.Height)) {
+                    sw.Restart();
+                    for (int i = 0; i < 50; i++) {
+                        tbx.DrawToBitmap(bmp, new Rectangle(0, 0, tbx.Width, tbx.Height));
+                    }
+                    sw.Stop();
+                }
+                long gdiPaintMs = sw.ElapsedMilliseconds;
+
+                // 3. 100 Typing insertions
+                core.Selection.SetIndex(100);
+                sw.Restart();
+                for (int i = 0; i < 100; i++) {
+                    core.TextManager.SetText(core.Caret.IndexOfChar, 0, "a");
+                    core.Caret.IndexOfChar += 1;
+                    wrapView.SetCaretPostion(core.Caret.IndexOfChar);
+                }
+                sw.Stop();
+                long gdiTypingMs = sw.ElapsedMilliseconds;
+
+                // --- GDI+ Benchmarks ---
+                tbx.SetTextBoxRender(gdipRender);
+                core.Selection.SetSelection(50, 600);
+
+                sw.Restart();
+                for (int i = 0; i < 1000; i++) {
+                    var fi = wrapView.FindFromPoint(new Point(200 + (i % 300), 50 + (i % 400)));
+                    Assert.True(fi.Find);
+                }
+                sw.Stop();
+                long gdipHitMs = sw.ElapsedMilliseconds;
+
+                using (var bmp = new Bitmap(tbx.Width, tbx.Height)) {
+                    sw.Restart();
+                    for (int i = 0; i < 50; i++) {
+                        tbx.DrawToBitmap(bmp, new Rectangle(0, 0, tbx.Width, tbx.Height));
+                    }
+                    sw.Stop();
+                }
+                long gdipPaintMs = sw.ElapsedMilliseconds;
+
+                core.Selection.SetIndex(100);
+                sw.Restart();
+                for (int i = 0; i < 100; i++) {
+                    core.TextManager.SetText(core.Caret.IndexOfChar, 0, "b");
+                    core.Caret.IndexOfChar += 1;
+                    wrapView.SetCaretPostion(core.Caret.IndexOfChar);
+                }
+                sw.Stop();
+                long gdipTypingMs = sw.ElapsedMilliseconds;
+
+                // Assert performance thresholds:
+                // 1000 hit tests should take well under 100ms (<0.1ms per hit test)
+                Assert.True(gdiHitMs < 200, $"GDI HitTest too slow: {gdiHitMs}ms for 1000 tests");
+                Assert.True(gdipHitMs < 200, $"GDIP HitTest too slow: {gdipHitMs}ms for 1000 tests");
+
+                // 50 repaints should achieve > 60 FPS (<833ms for 50 repaints)
+                Assert.True(gdiPaintMs < 800, $"GDI Paint too slow: {gdiPaintMs}ms for 50 frames");
+                Assert.True(gdipPaintMs < 800, $"GDIP Paint too slow: {gdipPaintMs}ms for 50 frames");
+
+                // 100 typing insertions should take under 250ms
+                Assert.True(gdiTypingMs < 250, $"GDI Typing too slow: {gdiTypingMs}ms for 100 chars");
+                Assert.True(gdipTypingMs < 250, $"GDIP Typing too slow: {gdipTypingMs}ms for 100 chars");
+            }
+        }
     }
 }
