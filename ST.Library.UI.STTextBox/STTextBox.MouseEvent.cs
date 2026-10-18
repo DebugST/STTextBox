@@ -96,13 +96,11 @@ namespace ST.Library.UI.STTextBox
                     return;
             }
             if (e.Button == System.Windows.Forms.MouseButtons.Left) {
-                var fi = c.ITextView.FindFromPoint(e.Location);
-                if (!fi.Find) return;
                 int oldLine = c.Caret.IndexOfLine;
-                c.Caret.CopyFromFindInfo(fi);
+                var fi = c.ITextView.SetCaretPostion(e.Location);
+                if (!fi.Find) return;
                 int nIndex = c.Caret.IndexOfChar;
                 c.Selection.SetSelection(c.Selection.AnchorIndex, nIndex);
-                c.ITextView.SetCaretPostion(fi.IndexOfChar);
                 bool scrolled = c.ITextView.ScrollToCaret();
                 if (scrolled) {
                     m_last_sel_region = Rectangle.Empty;

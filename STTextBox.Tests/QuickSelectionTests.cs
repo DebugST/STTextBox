@@ -378,5 +378,98 @@ namespace STTextBox.Tests
                 Assert.NotEqual(fiGdi.Location.X, fiGdip.Location.X);
             }
         }
+
+        [Fact]
+        public void NoWrapTextView_PartialSelection_ChineseText_GDIPlus_EliminatesGlyphShifting()
+        {
+            using (var tbx = new ST.Library.UI.STTextBox.STTextBox()) {
+                var view = new NoWrapTextView();
+                tbx.SetTextView(view);
+                tbx.Font = new Font("Consolas", 10.5f);
+                tbx.SetBounds(0, 0, 800, 200);
+
+                var render = new STTextBoxGDIPRender();
+                tbx.SetTextBoxRender(render);
+
+                string content = "\u4e24\u628a\u81f4\u591a\u5b89\u6668\u9876\u671f\u989d\u4e00\u4e8c\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341";
+                tbx.SetText(content);
+
+                // 1. Render without selection
+                using (var bmpUnselected = new Bitmap(800, 100))
+                using (var g1 = Graphics.FromImage(bmpUnselected)) {
+                    g1.Clear(Color.White);
+                    render.OnBeginPaint(g1);
+                    view.OnDrawView(render);
+                    render.OnEndPaint(g1);
+
+                    // 2. Render with partial selection of Chinese characters (index 4 to 8)
+                    tbx.Select(4, 4);
+                    using (var bmpSelected = new Bitmap(800, 100))
+                    using (var g2 = Graphics.FromImage(bmpSelected)) {
+                        g2.Clear(Color.White);
+                        render.OnBeginPaint(g2);
+                        view.OnDrawView(render);
+                        render.OnEndPaint(g2);
+
+                        FindInfo fi4 = view.FindFromCharIndex(4);
+                        FindInfo fi8 = view.FindFromCharIndex(8);
+
+                        // Verify prefix region (characters 0..3): 0 pixel differences
+                        int prefixDiff = 0;
+                        int fontHeight = render.GetFontHeight();
+                        for (int y = view.TextRectangle.Top; y < view.TextRectangle.Top + fontHeight; y++) {
+                            for (int x = view.TextRectangle.Left; x < fi4.Location.X - 1; x++) {
+                                if (bmpUnselected.GetPixel(x, y).ToArgb() != bmpSelected.GetPixel(x, y).ToArgb()) {
+                                    prefixDiff++;
+                                }
+                            }
+                        }
+                        Assert.Equal(0, prefixDiff);
+
+                        // Verify suffix region (characters 8+): 0 pixel differences (zero glyph shift/jitter)
+                        int suffixDiff = 0;
+                        for (int y = view.TextRectangle.Top; y < view.TextRectangle.Top + fontHeight; y++) {
+                            for (int x = fi8.Location.X + 2; x < 600; x++) {
+                                if (bmpUnselected.GetPixel(x, y).ToArgb() != bmpSelected.GetPixel(x, y).ToArgb()) {
+                                    suffixDiff++;
+                                }
+                            }
+                        }
+                        Assert.Equal(0, suffixDiff);
+                    }
+                }
+            }
+        }
+
+        [Fact]
+        public void NoWrapTextView_FindFromPointAndCharIndex_HitTestsAccurately()
+        {
+            using (var tbx = new ST.Library.UI.STTextBox.STTextBox()) {
+                var view = new NoWrapTextView();
+                tbx.SetTextView(view);
+                tbx.Font = new Font("Consolas", 10.5f);
+                tbx.SetBounds(0, 0, 500, 200);
+
+                string line0 = "Line 000: Hello World\r\n";
+                string line1 = "Line 001: Fast Selection\r\n";
+                tbx.SetText(line0 + line1);
+
+                FindInfo fi0 = view.FindFromCharIndex(0);
+                Assert.True(fi0.Find);
+                Assert.Equal(0, fi0.IndexOfLine);
+                Assert.Equal(0, fi0.IndexOfCharInLine);
+
+                FindInfo fiLine1 = view.FindFromCharIndex(line0.Length + 5);
+                Assert.True(fiLine1.Find);
+                Assert.Equal(1, fiLine1.IndexOfLine);
+                Assert.Equal(5, fiLine1.IndexOfCharInLine);
+
+                // Hit test near that point
+                FindInfo fiHit = view.FindFromPoint(new Point(fiLine1.Location.X + 1, fiLine1.Location.Y + 2));
+                Assert.True(fiHit.Find);
+                Assert.Equal(1, fiHit.IndexOfLine);
+                Assert.Equal(5, fiHit.IndexOfCharInLine);
+            }
+        }
     }
 }
