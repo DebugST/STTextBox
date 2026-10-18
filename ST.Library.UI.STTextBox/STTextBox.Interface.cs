@@ -126,6 +126,47 @@ namespace ST.Library.UI.STTextBox
                 return this.IEmojiRender.IsEmoji(strChar);
             }
 
+            public bool TryGetEmoji(string text, int index, int maxLen, out int emojiLength, out string emojiStr) {
+                emojiLength = 0;
+                emojiStr = null;
+                if (this.IEmojiRender == null || index >= maxLen || string.IsNullOrEmpty(text)) return false;
+
+                // 1. Try grapheme cluster first (handles ZWJ sequences, skin tones, flags, surrogate pairs, BMP emojis)
+                if (this.IGraphemeSplitter is GraphemeSplitter gs) {
+                    int next = gs.NextBreak(text, index);
+                    if (next > index && next <= maxLen) {
+                        int len = next - index;
+                        string str = text.Substring(index, len);
+                        if (this.IsEmoji(str)) {
+                            emojiLength = len;
+                            emojiStr = str;
+                            return true;
+                        }
+                    }
+                }
+
+                // 2. Fallback: try surrogate pair (length 2) if high surrogate
+                char ch = text[index];
+                if (char.IsHighSurrogate(ch) && index + 1 < maxLen && char.IsLowSurrogate(text[index + 1])) {
+                    string str = text.Substring(index, 2);
+                    if (this.IsEmoji(str)) {
+                        emojiLength = 2;
+                        emojiStr = str;
+                        return true;
+                    }
+                }
+
+                // 3. Fallback: try single character (length 1, for BMP emojis like ☺, ⚽, ⚡)
+                string singleStr = text.Substring(index, 1);
+                if (this.IsEmoji(singleStr)) {
+                    emojiLength = 1;
+                    emojiStr = singleStr;
+                    return true;
+                }
+
+                return false;
+            }
+
             public int GetStringWidth(string strText, TextStyle textStyle, int nLeftWidth) {
                 if (this.IsEmoji(strText)) {
                     return this.FontHeight;

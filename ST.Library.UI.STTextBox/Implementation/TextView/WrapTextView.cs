@@ -635,27 +635,26 @@ namespace ST.Library.UI.STTextBox
                                 continue;
                             }
 
-                            if (char.IsHighSurrogate(ch) && j + 1 < subLen && char.IsLowSurrogate(raw[subLine.Index + j + 1])) {
-                                string surrogateStr = raw.Substring(subLine.Index + j, 2);
-                                if (c.IsEmoji(surrogateStr)) {
-                                    if (hasRun && j > runStart) {
-                                        string runStr = raw.Substring(subLine.Index + runStart, j - runStart);
-                                        int runW = subLine.Offsets[j] - subLine.Offsets[runStart];
-                                        TextStyle drawStyle = syntaxRunStyle;
-                                        if (isSelectionPass) {
-                                            drawStyle.ForeColor = selTextColor;
-                                            drawStyle.BackColor = Color.Transparent;
-                                        }
-                                        render.DrawString(runStr, drawStyle, new Rectangle(runStartX, nY, runW, c.LineHeight));
-                                        hasRun = false;
+                            int emojiLen;
+                            string emojiStr;
+                            if (c.TryGetEmoji(raw, subLine.Index + j, subLine.Index + subLen, out emojiLen, out emojiStr)) {
+                                if (hasRun && j > runStart) {
+                                    string runStr = raw.Substring(subLine.Index + runStart, j - runStart);
+                                    int runW = subLine.Offsets[j] - subLine.Offsets[runStart];
+                                    TextStyle drawStyle = syntaxRunStyle;
+                                    if (isSelectionPass) {
+                                        drawStyle.ForeColor = selTextColor;
+                                        drawStyle.BackColor = Color.Transparent;
                                     }
-                                    if (c.IEmojiRender != null) {
-                                        int emojiX = drawX + (subLine.Offsets != null ? subLine.Offsets[j] : 0);
-                                        c.IEmojiRender.DrawEmoji(render, surrogateStr, emojiX + (nCharSpacing >> 1), nY + nLineSpacing, c.FontHeight, isSelectionPass);
-                                    }
-                                    j++;
-                                    continue;
+                                    render.DrawString(runStr, drawStyle, new Rectangle(runStartX, nY, runW, c.LineHeight));
+                                    hasRun = false;
                                 }
+                                if (c.IEmojiRender != null) {
+                                    int emojiX = drawX + (subLine.Offsets != null ? subLine.Offsets[j] : 0);
+                                    c.IEmojiRender.DrawEmoji(render, emojiStr, emojiX + (nCharSpacing >> 1), nY + nLineSpacing, c.FontHeight, isSelectionPass);
+                                }
+                                j += emojiLen - 1;
+                                continue;
                             }
 
                             var syntaxStyle = c.GetStyleFromCharIndex(charIdx);

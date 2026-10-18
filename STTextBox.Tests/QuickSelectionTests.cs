@@ -1126,6 +1126,35 @@ this.Controls.Add(tbx);";
             }
         }
 
+        [Fact]
+        public void BmpEmojis_SingleChar_DetectionAndRenderTest()
+        {
+            using (var tbx = new ST.Library.UI.STTextBox.STTextBox())
+            {
+                string emojiPkg = @"demos_bin\svg_mix_twe";
+                if (!System.IO.File.Exists(emojiPkg))
+                {
+                    emojiPkg = @"..\..\..\..\demos_bin\svg_mix_twe";
+                }
+                if (System.IO.File.Exists(emojiPkg))
+                {
+                    var emoji = new ST.Library.Drawing.EmojiRender(emojiPkg);
+                    tbx.SetEmojiRender(emoji);
+                    Assert.True(emoji.IsEmoji("☺"));
+                    Assert.True(emoji.IsEmoji("⚽"));
+                    Assert.True(emoji.IsEmoji("⚡"));
+                }
+
+                tbx.SetBounds(0, 0, 400, 200);
+                tbx.SetText("☺⚽⚡");
+
+                using (var bmp = new Bitmap(tbx.Width, tbx.Height))
+                {
+                    tbx.DrawToBitmap(bmp, new Rectangle(0, 0, tbx.Width, tbx.Height));
+                }
+            }
+        }
+
     }
 }
 

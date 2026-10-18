@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -50,6 +50,7 @@ namespace ST.Library.Drawing
         }
 
         private string GetEmojiString(string strText) {
+            if (string.IsNullOrEmpty(strText)) return null;
             if (m_dic_xml.ContainsKey(strText)) {
                 return strText;
             }
@@ -58,6 +59,9 @@ namespace ST.Library.Drawing
             // FE0E -> text variation selector
             // FE0F -> emoji variation selector
             if (strText.IndexOf('\uFE0F') == -1) {
+                if (m_dic_xml.ContainsKey(strText + "\uFE0F")) {
+                    return strText + "\uFE0F";
+                }
                 return null;
             }
             strText = strText.Replace("\uFE0F", "");// strText.Substring(0, strText.Length - 1);
