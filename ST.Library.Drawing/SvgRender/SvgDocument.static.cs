@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -14,7 +14,7 @@ namespace ST.Library.Drawing.SvgRender
         private static Type m_type_svg_element = typeof(SvgElement);
         private static Regex m_reg_style_width = new Regex(@"\bwidth\s*:\s*(\.\d+|\d+(?:\.\d+))");
         private static Regex m_reg_style_height = new Regex(@"\bheight\s*:\s*(\.\d+|\d+(?:\.\d+))");
-        private static Regex m_reg_number = new Regex(@"(-?(\.\d+|\d(?:\.\d+)?)+)");
+        private static Regex m_reg_number = new Regex(@"([+-]?(?:\.\d+|\d+(?:\.\d+)?)(?:[eE][+-]?\d+)?)");
         private static Dictionary<string, Type> m_dic_target_type = new Dictionary<string, Type>();
 
         static SvgDocument() {

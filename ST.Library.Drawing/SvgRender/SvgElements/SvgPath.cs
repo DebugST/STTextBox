@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,7 +11,7 @@ namespace ST.Library.Drawing.SvgRender
     [SvgElement("path")]
     public partial class SvgPath : SvgElement
     {
-        private static Regex m_reg_d = new Regex(@"[a-zA-Z]|[+-]?(\.\d+|\d+(\.\d+)?)([eE]-\d+)?");
+        private static Regex m_reg_d = new Regex(@"[a-zA-Z]|[+-]?(?:\.\d+|\d+(?:\.\d+)?)(?:[eE][+-]?\d+)?");
         public override string TargetName {
             get { return "path"; }
         }
@@ -55,6 +55,7 @@ namespace ST.Library.Drawing.SvgRender
             PointF ptf_last_m = new PointF();
             PointF[] ptfs_bezier = new PointF[4];
             string[] args = m_strs_d;
+            if (args == null || args.Length == 0) return gp;
             string strCmd = "l";
             for (int i = 0; i < args.Length; i++) {
                 if (SvgAttributes.CheckIsFloat(args[i])) {
@@ -65,7 +66,7 @@ namespace ST.Library.Drawing.SvgRender
                 switch (strCmd) {
                     case "m":   //moveto
                     case "M":
-                        ptf_last = this.MoveTo(strCmd == "M", ptf_last, _F(args[i + 1]), _F(args[i + 2]));
+                        ptf_last = this.MoveTo(strCmd == "M", ptf_last, _F(args, i + 1), _F(args, i + 2));
                         i += 2;
                         strCmd = strCmd == "m" ? "l" : "L";   // set the last command to "l"
                         if (i > 0) {
@@ -75,17 +76,17 @@ namespace ST.Library.Drawing.SvgRender
                         break;
                     case "l":   //lineto
                     case "L":
-                        ptf_last = this.LineTo(strCmd == "L", gp, ptf_last, _F(args[i + 1]), _F(args[i + 2]));
+                        ptf_last = this.LineTo(strCmd == "L", gp, ptf_last, _F(args, i + 1), _F(args, i + 2));
                         i += 2;
                         break;
                     case "h":   //horizontal lineto
                     case "H":
-                        ptf_last = this.HorizontalLineTo(strCmd == "H", gp, ptf_last, _F(args[++i]));
+                        ptf_last = this.HorizontalLineTo(strCmd == "H", gp, ptf_last, _F(args, ++i));
                         //gp.CloseFigure();
                         break;
                     case "v":   //vertical lineto
                     case "V":
-                        ptf_last = this.VerticalLineTo(strCmd == "V", gp, ptf_last, _F(args[++i]));
+                        ptf_last = this.VerticalLineTo(strCmd == "V", gp, ptf_last, _F(args, ++i));
                         //gp.CloseFigure();
                         break;
                     case "c":   //curveto
@@ -93,8 +94,8 @@ namespace ST.Library.Drawing.SvgRender
                         ptfs_bezier[0] = ptf_last;
                         i++;
                         for (int j = 0; j < 3; j++) {
-                            ptfs_bezier[j + 1].X = float.Parse(args[i++]);
-                            ptfs_bezier[j + 1].Y = float.Parse(args[i++]);
+                            ptfs_bezier[j + 1].X = _F(args, i++);
+                            ptfs_bezier[j + 1].Y = _F(args, i++);
                         }
                         i--;
                         ptf_last = this.CurveTo(strCmd == "C", gp, ptfs_bezier);
@@ -111,8 +112,8 @@ namespace ST.Library.Drawing.SvgRender
                         }
                         i++;
                         for (int j = 0; j < 2; j++) {
-                            ptfs_bezier[j + 2].X = float.Parse(args[i++]);
-                            ptfs_bezier[j + 2].Y = float.Parse(args[i++]);
+                            ptfs_bezier[j + 2].X = _F(args, i++);
+                            ptfs_bezier[j + 2].Y = _F(args, i++);
                         }
                         i--;
                         ptf_last = this.SmoothCurveTo(strCmd == "S", gp, ptfs_bezier);
@@ -122,8 +123,8 @@ namespace ST.Library.Drawing.SvgRender
                         ptfs_bezier[0] = ptf_last;
                         i++;
                         for (int j = 0; j < 2; j++) {
-                            ptfs_bezier[j + 2].X = float.Parse(args[i++]);
-                            ptfs_bezier[j + 2].Y = float.Parse(args[i++]);
+                            ptfs_bezier[j + 2].X = _F(args, i++);
+                            ptfs_bezier[j + 2].Y = _F(args, i++);
                         }
                         ptfs_bezier[1] = ptfs_bezier[2];
                         i--;
@@ -134,8 +135,8 @@ namespace ST.Library.Drawing.SvgRender
                         ptfs_bezier[0] = ptfs_bezier[3];
                         ptfs_bezier[1].X = ptfs_bezier[3].X + ptfs_bezier[3].X - ptfs_bezier[2].X;
                         ptfs_bezier[1].Y = ptfs_bezier[3].Y + ptfs_bezier[3].Y - ptfs_bezier[2].Y;
-                        ptfs_bezier[3].X = _F(args[i + 1]);
-                        ptfs_bezier[3].Y = _F(args[i + 2]);
+                        ptfs_bezier[3].X = _F(args, i + 1);
+                        ptfs_bezier[3].Y = _F(args, i + 2);
                         ptfs_bezier[2] = ptfs_bezier[1];
                         ptf_last = this.QuadraticBezierCurveTo(strCmd == "T", gp, ptfs_bezier);
                         i += 2;
@@ -144,13 +145,13 @@ namespace ST.Library.Drawing.SvgRender
                     case "A":
                         ptf_last = this.EllipticalArc(strCmd == "A",
                             gp, ptf_last,
-                            _F(args[i + 1]),
-                            _F(args[i + 2]),
-                            _F(args[i + 3]),
-                            args[i + 4] != "0",
-                            args[i + 5] != "0",
-                            _F(args[i + 6]),
-                            _F(args[i + 7]));
+                            _F(args, i + 1),
+                            _F(args, i + 2),
+                            _F(args, i + 3),
+                            i + 4 < args.Length && args[i + 4] != "0",
+                            i + 5 < args.Length && args[i + 5] != "0",
+                            _F(args, i + 6),
+                            _F(args, i + 7));
                         i += 7;
                         break;
                     case "z":   //close path
@@ -166,11 +167,18 @@ namespace ST.Library.Drawing.SvgRender
 
         protected internal override void Dispose() { }
 
+        private float _F(string[] args, int index) {
+            if (args == null || index < 0 || index >= args.Length) return 0;
+            return _F(args[index]);
+        }
+
         private float _F(string strText) {
-            if (!SvgAttributes.CheckIsFloat(strText)) {
-                return 0;
+            if (string.IsNullOrEmpty(strText)) return 0;
+            float val;
+            if (float.TryParse(strText, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out val)) {
+                return val;
             }
-            return float.Parse(strText);
+            return 0;
         }
 
         private PointF MoveTo(bool isAbsolute, PointF ptF, float x, float y) {

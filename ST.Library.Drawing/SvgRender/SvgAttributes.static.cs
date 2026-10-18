@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,9 +12,9 @@ namespace ST.Library.Drawing.SvgRender
 
     public partial class SvgAttributes
     {
-        private static Regex m_reg_number = new Regex(@"([+-]?(?:\.\d+|\d+(?:\.\d+)?)(?:[eE]-\d+)?)");
-        private static Regex m_reg_angle = new Regex(@"([+-]?(?:\.\d+|\d+(?:\.\d+)?)(?:[eE]-\d+)?)(deg|grad|rad)?");
-        private static Regex m_reg_size = new Regex(@"([+-]?(?:\.\d+|\d+(?:\.\d+)?)(?:[eE]-\d+)?)(em|ex|px|in|cm|mm|pt|pc|%)?");
+        private static Regex m_reg_number = new Regex(@"([+-]?(?:\.\d+|\d+(?:\.\d+)?)(?:[eE][+-]?\d+)?)");
+        private static Regex m_reg_angle = new Regex(@"([+-]?(?:\.\d+|\d+(?:\.\d+)?)(?:[eE][+-]?\d+)?)(deg|grad|rad)?");
+        private static Regex m_reg_size = new Regex(@"([+-]?(?:\.\d+|\d+(?:\.\d+)?)(?:[eE][+-]?\d+)?)(em|ex|px|in|cm|mm|pt|pc|%)?");
         private static Regex m_reg_transform = new Regex(@"(rotate|scale|scaleX|scaleY|skew|skewX|skewY|translate|translateX|translateY|matrix)\((.*?)\)");
         private static Dictionary<string, Color> m_dic_color = new Dictionary<string, Color>();
         private static Dictionary<string, SvgAttributeValueCheckCallBack> m_dic_value_check = new Dictionary<string, SvgAttributeValueCheckCallBack>();
@@ -598,17 +598,18 @@ namespace ST.Library.Drawing.SvgRender
             if (string.IsNullOrEmpty(strText)) {
                 return false;
             }
-            return Regex.IsMatch(strText, @"^[+-]?(\.\d+|\d+(\.\d+)?)([eE]-\d+)?$");
+            float f;
+            return float.TryParse(strText, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out f);
         }
 
         public static bool CheckIsSize(string strText) {
             if (string.IsNullOrEmpty(strText)) return false;
-            return Regex.IsMatch(strText, @"^[+-]?(\.\d+|\d+(?:\.\d+)?)(em|ex|px|in|cm|mm|pt|pc|%)?$");
+            return Regex.IsMatch(strText, @"^[+-]?(\.\d+|\d+(?:\.\d+)?)([eE][+-]?\d+)?(em|ex|px|in|cm|mm|pt|pc|%)?$");
         }
 
         public static bool CheckIsAngle(string strText) {
             if (string.IsNullOrEmpty(strText)) return false;
-            return Regex.IsMatch(strText, @"^[+-]?(\.\d+|\d+(?:\.\d+)?)([eE]-\d+)?(deg|grad|rad)?$");
+            return Regex.IsMatch(strText, @"^[+-]?(\.\d+|\d+(?:\.\d+)?)([eE][+-]?\d+)?(deg|grad|rad)?$");
         }
 
         public static bool CheckIsColor(string strText) {
@@ -723,7 +724,11 @@ namespace ST.Library.Drawing.SvgRender
                 if (!inherit) return defaultValue;
                 return SvgAttributes.GetFloat(ele.CurrentParent, strName, true, defaultValue);
             }
-            return float.Parse(str);
+            float val;
+            if (float.TryParse(str, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out val)) {
+                return val;
+            }
+            return defaultValue;
         }
 
         public static Color GetColor(SvgElement ele, string strName) {
@@ -849,7 +854,8 @@ namespace ST.Library.Drawing.SvgRender
                 return 0;
             }
             // 90deg = 100grad = 0.25turn ≈ 1.570796326794897rad
-            float f = float.Parse(m.Groups[1].Value);
+            float f;
+            float.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out f);
             switch (m.Groups[1].Value) {
                 case "grad":
                     return f * 90 / 100;
@@ -878,7 +884,8 @@ namespace ST.Library.Drawing.SvgRender
             if (!m.Success) {
                 return defaultValue;
             }
-            float fSize = float.Parse(m.Groups[1].Value);
+            float fSize;
+            float.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out fSize);
             switch (m.Groups[2].Value) {
                 case "%":
                     return fSize / 100 * SvgAttributes.GetSize(ele.CurrentParent, strName, inherit, defaultValue);
@@ -913,7 +920,8 @@ namespace ST.Library.Drawing.SvgRender
                 bError = true;
                 return 0;
             }
-            float fSize = float.Parse(m.Groups[1].Value);
+            float fSize;
+            float.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out fSize);
             switch (m.Groups[2].Value) {
                 case "%":
                     return fSize / 100 * SvgAttributes.GetSize(ele, "width", true, 0);
@@ -947,7 +955,8 @@ namespace ST.Library.Drawing.SvgRender
             float[] arr = new float[ms.Count];
             for (int i = 0; i < arr.Length; i++) {
                 var m = ms[i];
-                float fSize = float.Parse(m.Groups[1].Value);
+                float fSize;
+                float.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out fSize);
                 switch (m.Groups[2].Value) {
                     case "%":
                         arr[i] = fSize / 100 * SvgAttributes.GetFontSize(ele.CurrentParent);
@@ -992,7 +1001,8 @@ namespace ST.Library.Drawing.SvgRender
             if (!m.Success) {   // The error value, search from parent to inherit
                 return SvgAttributes.GetFontSize(ele.CurrentParent);
             }
-            float fSize = float.Parse(m.Groups[1].Value);
+            float fSize;
+            float.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out fSize);
             switch (m.Groups[2].Value) {
                 case "%":
                     return fSize / 100 * SvgAttributes.GetFontSize(ele.CurrentParent);
@@ -1145,7 +1155,9 @@ namespace ST.Library.Drawing.SvgRender
                 if (!SvgAttributes.CheckIsFloat(strNum)) {
                     return 0;
                 }
-                return float.Parse(strNum);
+                float f;
+                float.TryParse(strNum, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out f);
+                return f;
             }
             if (strNum.Length < 2) {
                 return 0;
@@ -1154,7 +1166,9 @@ namespace ST.Library.Drawing.SvgRender
             if (!SvgAttributes.CheckIsFloat(strNum)) {
                 return 0;
             }
-            return 255 * (SvgAttributes.CheckRange(float.Parse(strNum), 0, 100) % 100);
+            float fPercent;
+            float.TryParse(strNum, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out fPercent);
+            return 255 * (SvgAttributes.CheckRange(fPercent, 0, 100) % 100);
         }
 
         private static float HueToRgb(float p, float q, float t) {
@@ -1189,10 +1203,11 @@ namespace ST.Library.Drawing.SvgRender
         }
 
         private static float _F(string strText) {
-            if (!SvgAttributes.CheckIsFloat(strText)) {
-                return 0;
+            float val;
+            if (float.TryParse(strText, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out val)) {
+                return val;
             }
-            return float.Parse(strText);
+            return 0;
         }
 
         private static float _F(string strText, float fMin, float fMax) {

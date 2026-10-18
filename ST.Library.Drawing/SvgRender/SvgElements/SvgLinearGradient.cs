@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -88,7 +88,9 @@ namespace ST.Library.Drawing.SvgRender
             }
             float fTemp = 0;
             if (strText[strText.Length - 1] == '%') {
-                fTemp = rectF.Width * float.Parse(strText.Substring(0, strText.Length - 1)) / 100;
+                float f;
+                float.TryParse(strText.Substring(0, strText.Length - 1), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out f);
+                fTemp = rectF.Width * f / 100;
             } else {
                 fTemp = SvgAttributes.GetSize(this, "x1", false, 0);
                 if (!bUserSpace)
@@ -108,7 +110,9 @@ namespace ST.Library.Drawing.SvgRender
             }
             float fTemp = 0;
             if (strText[strText.Length - 1] == '%') {
-                fTemp = rectF.Width * float.Parse(strText.Substring(0, strText.Length - 1)) / 100;
+                float f;
+                float.TryParse(strText.Substring(0, strText.Length - 1), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out f);
+                fTemp = rectF.Width * f / 100;
             } else {
                 fTemp = SvgAttributes.GetSize(this, "y1", false, 0);
                 if (!bUserSpace)
@@ -128,7 +132,9 @@ namespace ST.Library.Drawing.SvgRender
             }
             float fTemp = 0;
             if (strText[strText.Length - 1] == '%') {
-                fTemp = rectF.Width * float.Parse(strText.Substring(0, strText.Length - 1)) / 100;
+                float f;
+                float.TryParse(strText.Substring(0, strText.Length - 1), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out f);
+                fTemp = rectF.Width * f / 100;
             } else {
                 fTemp = SvgAttributes.GetSize(this, "x2", false, 0);
                 if (!bUserSpace)
@@ -148,7 +154,9 @@ namespace ST.Library.Drawing.SvgRender
             }
             float fTemp = 0;
             if (strText[strText.Length - 1] == '%') {
-                fTemp = rectF.Width * float.Parse(strText.Substring(0, strText.Length - 1)) / 100;
+                float f;
+                float.TryParse(strText.Substring(0, strText.Length - 1), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out f);
+                fTemp = rectF.Width * f / 100;
             } else {
                 fTemp = SvgAttributes.GetSize(this, "y2", false, 0);
                 if (!bUserSpace)
@@ -182,7 +190,9 @@ namespace ST.Library.Drawing.SvgRender
                     cb.Positions[i + 1] = cb.Positions[i];
                     continue;
                 }
-                cb.Positions[i + 1] = float.Parse(strOffset);
+                float fOffset;
+                float.TryParse(strOffset, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out fOffset);
+                cb.Positions[i + 1] = fOffset;
                 if (bFlag) {
                     cb.Positions[i + 1] /= 100;
                 }

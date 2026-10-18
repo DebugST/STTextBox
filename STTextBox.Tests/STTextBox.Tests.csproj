@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ST.Library.UI.STTextBox\ST.Library.UI.STTextBox.csproj" />
+    <ProjectReference Include="..\ST.Library.Drawing\ST.Library.Drawing.csproj" />
   </ItemGroup>
 
 </Project>

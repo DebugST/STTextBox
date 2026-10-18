@@ -1098,6 +1098,34 @@ this.Controls.Add(tbx);";
             }
         }
 
+        [Fact]
+        public void SvgPath_CultureInvariant_ParsingTest()
+        {
+            var oldCulture = System.Threading.Thread.CurrentThread.CurrentCulture;
+            try
+            {
+                System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.GetCultureInfo("ro-RO");
+
+                string svgXml = @"<svg viewBox=""0 0 36 36"" width=""36"" height=""36"">
+                    <path fill=""#DD2E44"" d=""M35.885 11.833c0-5.45-4.418-9.868-9.867-9.868-3.308 0-6.227 1.633-8.018 4.129-1.791-2.496-4.71-4.129-8.017-4.129-5.45 0-9.868 4.417-9.868 9.868 0 .772.098 1.52.266 2.241C1.751 22.587 11.216 31.568 18 34.034c6.783-2.466 16.249-11.447 17.617-19.96.17-.721.268-1.469.268-2.241z""/>
+                </svg>";
+
+                using (var doc = ST.Library.Drawing.SvgRender.SvgDocument.FromXml(svgXml))
+                {
+                    Assert.NotNull(doc);
+                    using (var bmp = new Bitmap(36, 36))
+                    using (var g = Graphics.FromImage(bmp))
+                    {
+                        doc.Draw(g, new RectangleF(0, 0, 36, 36));
+                    }
+                }
+            }
+            finally
+            {
+                System.Threading.Thread.CurrentThread.CurrentCulture = oldCulture;
+            }
+        }
+
     }
 }
 

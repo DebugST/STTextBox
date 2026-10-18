@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -40,7 +40,9 @@ namespace ST.Library.Drawing.SvgRender
                     pos_arr[i + 1] = pos_arr[i];
                     continue;
                 }
-                pos_arr[i + 1] = float.Parse(strOffset);
+                float fOffset;
+                float.TryParse(strOffset, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out fOffset);
+                pos_arr[i + 1] = fOffset;
                 if (bFlag) {
                     pos_arr[i + 1] /= 100;
                 }
