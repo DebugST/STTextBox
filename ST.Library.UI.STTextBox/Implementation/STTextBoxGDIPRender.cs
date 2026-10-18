@@ -29,12 +29,16 @@ namespace ST.Library.UI.STTextBox
         private SolidBrush m_brush;
         private Graphics m_g_onpaint;
         private Graphics m_g_private;
+        private Bitmap m_bmp_measure;
+        private Graphics m_g_measure;
         private float m_italic_width;
 
         private Rectangle m_rect_temp;
         private Rectangle m_rect_line;
         private Dictionary<string, int> m_dic_width_cache;
-
+        private readonly Dictionary<char, float> m_measure_cache = new Dictionary<char, float>();
+        private readonly Dictionary<string, float> m_dic_width_cache_float = new Dictionary<string, float>();
+        private readonly float[] m_ascii_widths = new float[128];
 
         private Control m_ctrl;
         private int m_nCounter;
@@ -57,20 +61,31 @@ namespace ST.Library.UI.STTextBox
             }
             m_ctrl = ctrl;
             m_ctrl.FontChanged += m_ctrl_FontChanged;
+            this.InitMeasureGraphics();
             this.InitData(m_ctrl.Font);
         }
 
         public void UnbindControl() {
-            m_ctrl.FontChanged -= m_ctrl_FontChanged;
+            if (m_ctrl != null) {
+                m_ctrl.FontChanged -= m_ctrl_FontChanged;
+                m_ctrl = null;
+            }
+            if (m_g_measure != null) {
+                m_g_measure.Dispose();
+                m_g_measure = null;
+            }
+            if (m_bmp_measure != null) {
+                m_bmp_measure.Dispose();
+                m_bmp_measure = null;
+            }
         }
 
         public void OnBeginPaint(Graphics g) {
-            //m_g_onpaint = g;
-            //m_b_onpaint = true;
-            this.XDPIZoom = g.DpiX / 96;
-            this.YDPIZoom = g.DpiY / 96;
-            if (this.XDPIZoom < 1) this.XDPIZoom = 1;
-            if (this.YDPIZoom < 1) this.YDPIZoom = 1;
+            this.XDPIZoom = g.DpiX / 96f;
+            this.YDPIZoom = g.DpiY / 96f;
+            if (this.XDPIZoom < 1f) this.XDPIZoom = 1f;
+            if (this.YDPIZoom < 1f) this.YDPIZoom = 1f;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
             m_g_onpaint = g;
         }
 
@@ -79,20 +94,37 @@ namespace ST.Library.UI.STTextBox
         }
 
         public void BeginPaint() {
-            if (m_nCounter == 0) {
-                m_g_private = m_ctrl.CreateGraphics();
+            if (m_g_measure == null && m_ctrl != null) {
+                this.InitMeasureGraphics();
             }
-            var g = m_g_private;
-            this.XDPIZoom = g.DpiX / 96;
-            this.YDPIZoom = g.DpiY / 96;
             m_nCounter++;
         }
 
         public void EndPaint() {
-            if (--m_nCounter == 0) {
-                m_g_private.Dispose();
-                m_g_private = null;
+            m_nCounter--;
+        }
+
+        private void InitMeasureGraphics() {
+            if (m_g_measure != null) {
+                m_g_measure.Dispose();
+                m_g_measure = null;
             }
+            if (m_bmp_measure != null) {
+                m_bmp_measure.Dispose();
+                m_bmp_measure = null;
+            }
+            m_bmp_measure = new Bitmap(1, 1);
+            if (m_ctrl != null) {
+                using (Graphics g = m_ctrl.CreateGraphics()) {
+                    m_bmp_measure.SetResolution(g.DpiX, g.DpiY);
+                    this.XDPIZoom = g.DpiX / 96f;
+                    this.YDPIZoom = g.DpiY / 96f;
+                    if (this.XDPIZoom < 1f) this.XDPIZoom = 1f;
+                    if (this.YDPIZoom < 1f) this.YDPIZoom = 1f;
+                }
+            }
+            m_g_measure = Graphics.FromImage(m_bmp_measure);
+            m_g_measure.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
         }
 
         public int SetTabSize(int nSize) {
@@ -158,13 +190,29 @@ namespace ST.Library.UI.STTextBox
             if (strText == "\t") {
                 return this.GetTabWidthFloat(fLeftWidth);
             }
-            Graphics g = this.GetGraphics();
-            string strKey = this.GetFontFlag(style);
-            Font ft = this.GetFontFromFlag(strKey);
-            float fWidth = g.MeasureString(strText, ft, 10000, m_sf).Width;
+            bool isRegular = (style.FontStyle == FontStyle.Regular || style.FontStyle == 0);
+            if (strText.Length == 1 && isRegular) {
+                char ch = strText[0];
+                if (ch < 128) {
+                    return m_ascii_widths[ch];
+                }
+                if (m_measure_cache.TryGetValue(ch, out float cw)) return cw;
+                Graphics g = this.GetGraphics();
+                cw = g.MeasureString(strText, m_ft_normal, 10000, m_sf).Width;
+                m_measure_cache[ch] = cw;
+                return cw;
+            }
+            string strKey = ((int)style.FontStyle).ToString() + ":" + strText;
+            if (m_dic_width_cache_float.TryGetValue(strKey, out float w)) {
+                return w;
+            }
+            Graphics g2 = this.GetGraphics();
+            Font ft = this.GetFont(style.FontStyle);
+            float fWidth = g2.MeasureString(strText, ft, 10000, m_sf).Width;
             if ((ft.Style & FontStyle.Italic) == FontStyle.Italic) {
                 fWidth += m_italic_width;
             }
+            m_dic_width_cache_float[strKey] = fWidth;
             return fWidth;
         }
 
@@ -188,7 +236,9 @@ namespace ST.Library.UI.STTextBox
                 g.FillRectangle(m_brush, rect.X, rect.Bottom - m_rect_line.Height, rect.Width, (float)m_rect_line.Height);
             }
             if (style.ForeColor.A > 0) {
-                m_brush.Color = style.ForeColor;
+                if (m_brush.Color != style.ForeColor) {
+                    m_brush.Color = style.ForeColor;
+                }
                 if (strText.Length == 1) {
                     Rectangle intRect = Rectangle.Round(rect);
                     switch (strText[0]) {
@@ -204,7 +254,8 @@ namespace ST.Library.UI.STTextBox
                             return;
                     }
                 }
-                g.DrawString(strText, this.GetFontFromFlag(this.GetFontFlag(style)), m_brush, rect, m_sf);
+                Font ft = this.GetFont(style.FontStyle);
+                g.DrawString(strText, ft, m_brush, rect, m_sf);
             }
             if ((style.FontStyle & FontStyle.Strikeout) == FontStyle.Strikeout && style.StrikeOutColor.A > 0) {
                 m_brush.Color = style.StrikeOutColor;
@@ -299,7 +350,9 @@ namespace ST.Library.UI.STTextBox
             if (m_ft_normal == ft) {
                 return;
             }
-            this.BeginPaint();
+            if (m_g_measure == null && m_ctrl != null) {
+                this.InitMeasureGraphics();
+            }
             m_rect_line.Height = (int)Math.Round(this.YDPIZoom * 1);
             if (m_rect_line.Height == 0) m_rect_line.Height = 1;
             m_ft_normal = ft;
@@ -311,17 +364,11 @@ namespace ST.Library.UI.STTextBox
             m_ft_bold_italic = new Font(ft, FontStyle.Bold | FontStyle.Italic);
             this.FontHeight = ft.Height;
             m_dic_width_cache.Clear();
+            m_dic_width_cache_float.Clear();
+            m_measure_cache.Clear();
 
             Graphics g = this.GetGraphics();
             this.CharWidthFloat = g.MeasureString("W", ft, 10000, m_sf).Width;
-
-            //SPACE are used to calculate TAB width.
-            int nWidth = this.GetStringWidth(" ", TextStyle.Empty, 0);
-            m_dic_width_cache.Add(" ", nWidth);
-            m_dic_width_cache.Add("\r", nWidth);
-            m_dic_width_cache.Add("\n", nWidth);
-            m_dic_width_cache.Add("\r\n", nWidth);
-            this.SpaceWidth = nWidth;
 
             float fIWidth = g.MeasureString("i", ft, 10000, m_sf).Width;
             this.IsMonospaced = Math.Abs(fIWidth - this.CharWidthFloat) < 0.001f;
@@ -330,48 +377,72 @@ namespace ST.Library.UI.STTextBox
             } else {
                 m_italic_width = 0;
             }
-            this.EndPaint();
+
+            // Pre-calculate ASCII lookup table for sub-nanosecond character measurement
+            Array.Clear(m_ascii_widths, 0, m_ascii_widths.Length);
+            for (char ch = ' '; ch <= '~'; ch++) {
+                if (this.IsMonospaced) {
+                    m_ascii_widths[ch] = this.CharWidthFloat;
+                } else {
+                    m_ascii_widths[ch] = g.MeasureString(ch.ToString(), ft, 10000, m_sf).Width;
+                }
+            }
+            m_ascii_widths['\r'] = 0f;
+            m_ascii_widths['\n'] = 0f;
+
+            // SPACE are used to calculate TAB width.
+            int nWidth = (int)Math.Ceiling(m_ascii_widths[' ']);
+            if (nWidth <= 0) nWidth = 8;
+            m_dic_width_cache.Add(" ", nWidth);
+            m_dic_width_cache.Add("\r", 0);
+            m_dic_width_cache.Add("\n", 0);
+            m_dic_width_cache.Add("\r\n", 0);
+            this.SpaceWidth = nWidth;
         }
 
         private Graphics GetGraphics() {
             if (m_g_onpaint != null) return m_g_onpaint;
+            if (m_g_measure != null) return m_g_measure;
+            if (m_ctrl != null) {
+                this.InitMeasureGraphics();
+                if (m_g_measure != null) return m_g_measure;
+            }
             if (m_g_private != null) return m_g_private;
-            throw new InvalidOperationException("The Graphics is null, please call BeginPaint() to init it.");
+            throw new InvalidOperationException("The Graphics is null, please call BeginPaint() or bind a control to initialize it.");
         }
 
-        private string GetFontFlag(TextStyle style) {
-            string strKey = "N";
-            if ((style.FontStyle & FontStyle.Bold) == FontStyle.Bold) {
-                strKey += "B";
-            }
-            if ((style.FontStyle & FontStyle.Italic) == FontStyle.Italic) {
-                strKey += "I";
-            }
-            return strKey;
-        }
-
-        private Font GetFontFromFlag(string strFlag) {
-            switch (strFlag) {
-                case "NBI":
-                    return m_ft_bold_italic;
-                case "NB":
-                    return m_ft_bold;
-                case "NI":
-                    return m_ft_italic;
-            }
+        private Font GetFont(FontStyle style) {
+            bool bold = (style & FontStyle.Bold) != 0;
+            bool italic = (style & FontStyle.Italic) != 0;
+            if (bold && italic) return m_ft_bold_italic;
+            if (bold) return m_ft_bold;
+            if (italic) return m_ft_italic;
             return m_ft_normal;
         }
 
         // [interface] ==========================================
 
         public void Dispose() {
-            if (m_g_private != null) m_g_private.Dispose();
+            if (m_g_measure != null) {
+                m_g_measure.Dispose();
+                m_g_measure = null;
+            }
+            if (m_bmp_measure != null) {
+                m_bmp_measure.Dispose();
+                m_bmp_measure = null;
+            }
+            if (m_g_private != null) {
+                m_g_private.Dispose();
+                m_g_private = null;
+            }
             if (m_ft_bold != null) m_ft_bold.Dispose();
             if (m_ft_italic != null) m_ft_italic.Dispose();
             if (m_ft_bold_italic != null) m_ft_bold_italic.Dispose();
             if (m_brush != null) m_brush.Dispose();
             if (m_sf != null) m_sf.Dispose();
             if (m_dic_width_cache != null) m_dic_width_cache.Clear();
+            if (m_dic_width_cache_float != null) m_dic_width_cache_float.Clear();
+            if (m_measure_cache != null) m_measure_cache.Clear();
         }
     }
 }

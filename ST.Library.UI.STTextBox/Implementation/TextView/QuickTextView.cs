@@ -16,7 +16,7 @@ namespace ST.Library.UI.STTextBox
     {
         private const int LINE_OVERLAP_MARGIN = 1;
         private int m_nMaxLineWidth;
-        private readonly Dictionary<int, float[]> m_dic_line_widths = new Dictionary<int, float[]>();
+        private readonly Dictionary<TextLine, float[]> m_dic_line_widths = new Dictionary<TextLine, float[]>();
         private readonly Dictionary<char, float> m_dic_char_widths = new Dictionary<char, float>();
 
         private readonly StringFormat m_sf = new StringFormat(StringFormat.GenericTypographic) {
@@ -44,25 +44,27 @@ namespace ST.Library.UI.STTextBox
             m_nMaxLineWidth = 0;
             var c = base.Core;
             if (c == null) return;
-            for (int i = 0; i < c.TextManager.LineCount; i++) {
-                GetOrCreateLineWidthCache(i, c.TextManager[i].RawString);
+            float mono = c.ITextBoxRender.CharWidthFloat;
+            if (c.ITextBoxRender.IsMonospaced && mono > 0f) {
+                int maxLen = 0;
+                for (int i = 0; i < c.TextManager.LineCount; i++) {
+                    int len = c.TextManager[i].RawString.Length;
+                    if (len > maxLen) maxLen = len;
+                }
+                m_nMaxLineWidth = (int)Math.Ceiling(maxLen * mono);
             }
         }
 
         public override void OnLineAdded(ISTTextBoxRender render, TextManagerLineEventArgs e) {
-            m_dic_line_widths.Clear();
+            // Lazy caching: line will be measured on demand
         }
 
         public override void OnLineRemoved(ISTTextBoxRender render, TextManagerLineEventArgs e) {
-            m_dic_line_widths.Clear();
+            m_dic_line_widths.Remove(e.Line);
         }
 
         public override void OnLineChanged(ISTTextBoxRender render, TextManagerLineEventArgs e) {
-            int lineIndex = base.Core.TextManager.GetLineIndexFromCharIndex(e.Line.IndexOfFirstChar);
-            if (lineIndex >= 0) {
-                m_dic_line_widths.Remove(lineIndex);
-                GetOrCreateLineWidthCache(lineIndex, e.Line.RawString);
-            }
+            m_dic_line_widths.Remove(e.Line);
         }
 
         public override int GetCurrentCharOffset() {
@@ -87,7 +89,7 @@ namespace ST.Library.UI.STTextBox
             TextLine line = c.TextManager[nIndexLine];
             fi.Line = line;
             fi.IndexOfLine = nIndexLine;
-            float[] widths = GetOrCreateLineWidthCache(nIndexLine, line.RawString);
+            float[] widths = GetOrCreateLineWidthCache(line, line.RawString);
             float targetX = (float)(pt.X - base.TextRectangle.Left + c.Scroll.XOffset);
 
             // Fast binary search for column
@@ -131,7 +133,7 @@ namespace ST.Library.UI.STTextBox
             }
             TextLine line = c.TextManager[nLineIndex];
             int col = nIndex - line.IndexOfFirstChar;
-            float[] widths = GetOrCreateLineWidthCache(nLineIndex, line.RawString);
+            float[] widths = GetOrCreateLineWidthCache(line, line.RawString);
             int colClamped = Math.Max(0, Math.Min(col, widths.Length - 1));
             int x = base.TextRectangle.Left - c.Scroll.XOffset + (int)Math.Round(widths[colClamped]);
             int y = base.TextRectangle.Y + (nLineIndex - c.Scroll.YValue) * c.LineHeight;
@@ -163,7 +165,7 @@ namespace ST.Library.UI.STTextBox
             int selEndCol = Math.Min(lineLen, selection.EndIndex - lineStart);
             if (selEndCol <= selStartCol) return;
 
-            float[] widths = GetOrCreateLineWidthCache(nLineIndex, line.RawString);
+            float[] widths = GetOrCreateLineWidthCache(line, line.RawString);
             int selStartX = base.TextRectangle.Left - c.Scroll.XOffset + (int)Math.Round(widths[selStartCol]);
             int selEndX = base.TextRectangle.Left - c.Scroll.XOffset + (int)Math.Round(widths[selEndCol]);
             int selWidth = selEndX - selStartX;
@@ -185,8 +187,7 @@ namespace ST.Library.UI.STTextBox
             }
             if (drawLength == 0) return c.LineHeight;
 
-            int lineIndex = c.TextManager.GetLineIndexFromCharIndex(line.IndexOfFirstChar);
-            float[] widths = GetOrCreateLineWidthCache(lineIndex, raw);
+            float[] widths = GetOrCreateLineWidthCache(line, raw);
 
             int lineStart = line.IndexOfFirstChar;
             int lineEnd = lineStart + drawLength;
@@ -271,44 +272,56 @@ namespace ST.Library.UI.STTextBox
             if (c.Scroll.MaxXValue < 0) c.Scroll.MaxXValue = 0;
         }
 
-        private float[] GetOrCreateLineWidthCache(int lineIndex, string text) {
-            if (m_dic_line_widths.TryGetValue(lineIndex, out float[] cached)) {
+        private float[] GetOrCreateLineWidthCache(TextLine line, string text) {
+            if (m_dic_line_widths.TryGetValue(line, out float[] cached)) {
                 return cached;
             }
             float[] widths = new float[text.Length + 1];
             float currentWidth = 0f;
             var c = base.Core;
-            c.ITextBoxRender.BeginPaint();
-            try {
-                float monoAdvance = c.ITextBoxRender.CharWidthFloat;
-                bool isMono = c.ITextBoxRender.IsMonospaced && monoAdvance > 0f;
+            float monoAdvance = c.ITextBoxRender.CharWidthFloat;
+            bool isMono = c.ITextBoxRender.IsMonospaced && monoAdvance > 0f;
 
+            if (isMono && text.IndexOf('\t') < 0) {
                 for (int i = 0; i < text.Length; i++) {
                     char ch = text[i];
-                    float w;
-                    if (ch == '\t') {
-                        w = c.GetStringWidthFloat("\t", TextStyle.Empty, currentWidth);
-                    } else if (ch == '\r' || ch == '\n') {
-                        w = 0f;
-                    } else if (isMono && ch >= 32 && ch <= 126) {
-                        w = monoAdvance;
+                    if (ch == '\r' || ch == '\n') {
+                        widths[i + 1] = currentWidth;
                     } else {
-                        if (!m_dic_char_widths.TryGetValue(ch, out w)) {
-                            w = c.GetStringWidthFloat(ch.ToString(), TextStyle.Empty, currentWidth);
-                            m_dic_char_widths[ch] = w;
-                        }
+                        currentWidth += monoAdvance;
+                        widths[i + 1] = currentWidth;
                     }
-                    currentWidth += w;
-                    widths[i + 1] = currentWidth;
                 }
-            } finally {
-                c.ITextBoxRender.EndPaint();
+            } else {
+                c.ITextBoxRender.BeginPaint();
+                try {
+                    for (int i = 0; i < text.Length; i++) {
+                        char ch = text[i];
+                        float w;
+                        if (ch == '\t') {
+                            w = c.GetStringWidthFloat("\t", TextStyle.Empty, currentWidth);
+                        } else if (ch == '\r' || ch == '\n') {
+                            w = 0f;
+                        } else if (isMono && ch >= 32 && ch <= 126) {
+                            w = monoAdvance;
+                        } else {
+                            if (!m_dic_char_widths.TryGetValue(ch, out w)) {
+                                w = c.GetStringWidthFloat(ch.ToString(), TextStyle.Empty, currentWidth);
+                                m_dic_char_widths[ch] = w;
+                            }
+                        }
+                        currentWidth += w;
+                        widths[i + 1] = currentWidth;
+                    }
+                } finally {
+                    c.ITextBoxRender.EndPaint();
+                }
             }
             int intTotalWidth = (int)Math.Ceiling(currentWidth);
             if (intTotalWidth > m_nMaxLineWidth) {
                 m_nMaxLineWidth = intTotalWidth;
             }
-            m_dic_line_widths[lineIndex] = widths;
+            m_dic_line_widths[line] = widths;
             return widths;
         }
     }

@@ -39,6 +39,7 @@ namespace ST.Library.UI.STTextBox
 
         private readonly Dictionary<char, int> m_measure_cache = new Dictionary<char, int>();
         private readonly Dictionary<string, int> m_dic_width_cache = new Dictionary<string, int>();
+        private readonly int[] m_ascii_widths = new int[128];
 
         public STTextBoxGDIRender() {
             this.TabSize = 4;
@@ -122,6 +123,7 @@ namespace ST.Library.UI.STTextBox
             // Single character fast cache
             if (strText.Length == 1 && (style.FontStyle == FontStyle.Regular || style.FontStyle == 0)) {
                 char ch = strText[0];
+                if (ch < 128) return m_ascii_widths[ch];
                 if (m_measure_cache.TryGetValue(ch, out int w)) return w;
                 w = MeasureChar(ch, m_ft_normal);
                 m_measure_cache[ch] = w;
@@ -284,6 +286,14 @@ namespace ST.Library.UI.STTextBox
             int iWidth = MeasureStringWidth("i", ft);
             int wWidth = MeasureStringWidth("W", ft);
             this.IsMonospaced = (iWidth == wWidth);
+
+            Array.Clear(m_ascii_widths, 0, m_ascii_widths.Length);
+            for (char ch = ' '; ch <= '~'; ch++) {
+                m_ascii_widths[ch] = this.IsMonospaced ? nWidth : MeasureStringWidth(ch.ToString(), ft);
+            }
+            m_ascii_widths['\r'] = 0;
+            m_ascii_widths['\n'] = 0;
+
             this.EndPaint();
         }
 
