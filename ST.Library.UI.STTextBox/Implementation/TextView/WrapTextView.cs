@@ -68,6 +68,7 @@ namespace ST.Library.UI.STTextBox
             this.WrapMethod = method;
             this.WrapAlignment = alignment;
             if (this.Core == null) return;
+            this.OnCalcTextRectangle();
             this.OnInitAllText();
         }
 
@@ -89,12 +90,23 @@ namespace ST.Library.UI.STTextBox
 
         public override void OnInitAllText() {
             var c = base.Core;
+            if (c == null) return;
+            if (base.TextRectangle.Width <= 0) {
+                this.OnCalcTextRectangle();
+            }
+            int nLineOffset = 0;
             c.ITextBoxRender.BeginPaint();
             foreach (var line in base.Core.TextManager) {
                 this.CacheLine(line, base.Core.ITextBoxRender);
+                var tag = _Tag(line);
+                tag.ScreenLineOffset = nLineOffset;
+                nLineOffset += tag.SubLines.Count;
             }
             c.ITextBoxRender.EndPaint();
-            c.TextBox.Invalidate();
+            this.OnCalcScroll(c.Scroll);
+            if (c.TextBox != null) {
+                c.TextBox.Invalidate();
+            }
         }
 
         public override void OnLineAdded(ISTTextBoxRender render, TextManagerLineEventArgs e) {
@@ -185,10 +197,11 @@ namespace ST.Library.UI.STTextBox
             int nLineWidth = nWidth, nCharWidth = 0;
             int nSubStrLen = 0;
             int nCharCount = 0;
-            int nTextViewLineWidth = base.TextRectangle.Width;
+            int nTextViewLineWidth = Math.Max(10, base.TextRectangle.Width);
             if (this.WrapAlignment != Alignment.Left) {
                 nTextViewLineWidth -= c.ITextBoxRender.GetSpaceWidth();
             }
+            nTextViewLineWidth = Math.Max(1, nTextViewLineWidth);
             c.IGraphemeSplitter.Each(line.RawString, nStartIndex, (str, nStart, nLen) => {
                 string strChar = str.Substring(nStart, nLen);
                 if (c.IsEmoji(strChar)) {
@@ -229,13 +242,11 @@ namespace ST.Library.UI.STTextBox
             int nLineWidth = 0;
             int nSubStrLen = 0, nIndexStart = 0;
             List<SubLineInfo> lst = new List<SubLineInfo>();
-            int nTextViewLineWidth = base.TextRectangle.Width;
+            int nTextViewLineWidth = Math.Max(10, base.TextRectangle.Width);
             if (this.WrapAlignment != Alignment.Left) {
                 nTextViewLineWidth -= c.ITextBoxRender.GetSpaceWidth();
             }
-            //if (this.Alignment == UI.STTextBox.Alignment.Justify) {
-            //    nTextViewLineWidth -= c.ITextRender.GetSpaceWidth();
-            //}
+            nTextViewLineWidth = Math.Max(1, nTextViewLineWidth);
             c.IWordSplitter.Each(line.RawString, (str, nStart, nLen) => {
                 string strWord = str.Substring(nStart, nLen);
                 nCharCountTemp = 0;
@@ -247,9 +258,8 @@ namespace ST.Library.UI.STTextBox
                         if (c.IsEmoji(strChar)) {
                             nCharWidth = c.FontHeight;
                         } else {
-                            nCharWidth = c.GetStringWidth(strChar, c.GetStyleFromCharIndex(line.IndexOfFirstChar + nStart), nLineWidth);
+                            nCharWidth = c.GetStringWidth(strChar, c.GetStyleFromCharIndex(line.IndexOfFirstChar + nStart + ns), nLineWidth);
                         }
-                        nCharCountTemp++;
                         if (nLineWidth + nCharWidth >= nTextViewLineWidth) {
                             lst.Add(new SubLineInfo() {
                                 Index = nIndexStart,
@@ -260,11 +270,11 @@ namespace ST.Library.UI.STTextBox
                             nIndexStart += nSubStrLen;
                             nSubStrLen = nl;
                             nLineWidth = nCharWidth;
-                            nCharCount = nCharCountTemp;
+                            nCharCount = 1;
                         } else {
                             nSubStrLen += nl;
                             nLineWidth += nCharWidth;
-                            nCharCount += nCharCountTemp;
+                            nCharCount++;
                         }
                     });
                     return true;
@@ -350,7 +360,7 @@ namespace ST.Library.UI.STTextBox
             var c = base.Core;
             FindInfo fi = new FindInfo();
             int nXStart = base.TextRectangle.X;
-            float nX = 0;// nXStart - c.Scroll.XOffset;
+            float nX = 0;
             int nIndexChar = 0, nCharWidth = 0;
             int nYOffset = ((pt.Y - base.TextRectangle.Y) / c.LineHeight);
             int nYValue = c.Scroll.YValue + nYOffset;
@@ -358,41 +368,44 @@ namespace ST.Library.UI.STTextBox
             int nIndexLine = this.GetLineIndexFromYScroll(nYValue);
             TextLine line = c.TextManager[nIndexLine];
             var tag = _Tag(line);
-            //SubLineInfo subLine = tag.SubLines[0];
+            if (tag.SubLines == null || tag.SubLines.Count == 0) {
+                fi.Line = line;
+                fi.IndexOfLine = nIndexLine;
+                fi.IndexOfCharInLine = 0;
+                fi.Location = new Point(base.TextRectangle.X, base.TextRectangle.Y + nYOffset * c.LineHeight);
+                fi.Find = true;
+                return fi;
+            }
             if (nYValue >= tag.ScreenLineOffset + tag.SubLines.Count) {
                 nYOffset -= nYValue - tag.ScreenLineOffset - tag.SubLines.Count + 1;
             }
-            //if (tag.ScreenLineOffset < nYValue) {
             var temp = nYValue - tag.ScreenLineOffset;
+            if (temp < 0) temp = 0;
             if (temp >= tag.SubLines.Count) {
                 temp = tag.SubLines.Count - 1;
             }
             var subLine = tag.SubLines[temp];
-            //}
-            //nX += subLine.X;
             fi.Line = line;
             fi.IndexOfLine = nIndexLine;
-            //var nXXX = subLine.ExtraWidth * 2;
             c.ITextBoxRender.BeginPaint();
             c.IGraphemeSplitter.Each(line.RawString.Substring(subLine.Index, subLine.Length), nIndexChar, (str, nStart, nLen) => {
                 if (str[nStart] == '\r') return false;
                 if (str[nStart] == '\n') return false;
                 string strChar = str.Substring(nStart, nLen);
-                nCharWidth = c.GetStringWidth(strChar, c.GetStyleFromCharIndex(line.IndexOfFirstChar + nStart), (int)nX/* - base.TextRectangle.X + c.Scroll.XOffset*/);
-                //nCharWidth += (int)nXXX;
+                nCharWidth = c.GetStringWidth(strChar, c.GetStyleFromCharIndex(line.IndexOfFirstChar + subLine.Index + nStart), (int)nX);
                 if (nX + subLine.X + base.TextRectangle.X + nCharWidth > pt.X) {
                     fi.Find = true;
                     if (pt.X - base.TextRectangle.X - subLine.X - nX >= nCharWidth / 2) {
-                        fi.IndexOfCharInLine = subLine.Index + nIndexChar + nLen;
+                        fi.IndexOfCharInLine = subLine.Index + nStart + nLen;
                         fi.Location = new Point((int)nX + nCharWidth + base.TextRectangle.X + subLine.X, base.TextRectangle.Y + nYOffset * c.LineHeight);
                     } else {
-                        fi.IndexOfCharInLine = subLine.Index + nIndexChar;
+                        fi.IndexOfCharInLine = subLine.Index + nStart;
                         fi.Location = new Point((int)nX + base.TextRectangle.X + subLine.X, base.TextRectangle.Y + nYOffset * c.LineHeight);
                     }
                     return false;
                 }
                 nX += nCharWidth;
-                nIndexChar += nLen;
+                nIndexChar = nStart + nLen;
                 return true;
             });
             c.ITextBoxRender.EndPaint();
@@ -401,7 +414,6 @@ namespace ST.Library.UI.STTextBox
                 fi.Location = new Point((int)nX + base.TextRectangle.X + subLine.X, base.TextRectangle.Y + nYOffset * c.LineHeight);
             }
             fi.Find = true;
-            //Console.WriteLine("->>>>>>>>>>>>>>>>>>>>>" + line.RawString.Substring(subLine.Index, subLine.Length) + " -- " + fi.IndexOfChar);
             return fi;
         }
 
@@ -409,7 +421,7 @@ namespace ST.Library.UI.STTextBox
             var c = base.Core;
             int nIndexOfLine = c.TextManager.GetLineIndexFromCharIndex(nIndex);
             TextLine stLine = c.TextManager[nIndexOfLine];
-            if (stLine == null) {// TODO: stLine will not be null
+            if (stLine == null) {
                 return new FindInfo();
             }
             return this.FindFromCharIndex(nIndexOfLine, nIndex - stLine.IndexOfFirstChar);
@@ -419,25 +431,31 @@ namespace ST.Library.UI.STTextBox
             var c = base.Core;
             return this.FindFromCharIndex(c.ITextBoxRender, nIndexOfLine, nIndex);
         }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="g"></param>
-        /// <param name="stLine"></param>
-        /// <param name="nIndex">Index of stLine</param>
-        /// <returns></returns>
+
         private FindInfo FindFromCharIndex(ISTTextBoxRender render, int nIndexOfLine, int nIndex) {
             var c = base.Core;
             TextLine line = c.TextManager[nIndexOfLine];
             int nX = base.TextRectangle.X;
             int nCharWidth = 0;
             var tag = _Tag(line);
+            if (tag.SubLines == null || tag.SubLines.Count == 0) {
+                return new FindInfo() {
+                    Find = true,
+                    Line = line,
+                    IndexOfLine = nIndexOfLine,
+                    IndexOfCharInLine = 0,
+                    Location = new Point(base.TextRectangle.X, base.TextRectangle.Y + (tag.ScreenLineOffset - c.Scroll.YValue) * c.LineHeight)
+                };
+            }
             int nSubIndex = 0;
             foreach (var sub in tag.SubLines) {
                 if (nIndex >= sub.Index && nIndex < sub.Index + sub.Length) {
                     break;
                 }
                 nSubIndex++;
+            }
+            if (nSubIndex >= tag.SubLines.Count) {
+                nSubIndex = Math.Max(0, tag.SubLines.Count - 1);
             }
             var subLine = tag.SubLines[nSubIndex];
             c.IGraphemeSplitter.Each(line.RawString.Substring(subLine.Index, subLine.Length), (str, nStart, nLen) => {
@@ -450,6 +468,7 @@ namespace ST.Library.UI.STTextBox
                 return true;
             });
             return new FindInfo() {
+                Find = true,
                 Line = line,
                 IndexOfLine = nIndexOfLine,
                 IndexOfCharInLine = nIndex,
@@ -490,7 +509,7 @@ namespace ST.Library.UI.STTextBox
                             strChar = str.Substring(nStart, nLen - 1);
                         }
                         bIsEmoji = false;
-                        nCharWidth = c.GetStringWidth(strChar, c.GetStyleFromCharIndex(line.IndexOfFirstChar + nStart), rect_char.X - subLine.X - base.TextRectangle.X) + nCharSpacing;
+                        nCharWidth = c.GetStringWidth(strChar, c.GetStyleFromCharIndex(line.IndexOfFirstChar + subLine.Index + nStart), rect_char.X - subLine.X - base.TextRectangle.X) + nCharSpacing;
                     }
                     if (nXStart + nCharWidth <= base.TextRectangle.Left) {
                         nXStart += nCharWidth;
@@ -621,10 +640,18 @@ namespace ST.Library.UI.STTextBox
 
         public override void SetCaretPostion(int nCharIndex) {
             var c = this.Core;
+            if (c == null) return;
             int nLineIndex = c.TextManager.GetLineIndexFromCharIndex(nCharIndex);
             var line = c.TextManager[nLineIndex];
             int nWidth = 0, nTempCharIndex = 0, nSubLineIndex = 0;
             var tag = _Tag(line);
+            if (tag.SubLines == null || tag.SubLines.Count == 0) {
+                c.Caret.Line = line;
+                c.Caret.IndexOfLine = nLineIndex;
+                c.Caret.IndexOfChar = nCharIndex;
+                this.SetCaretPostion(this.TextRectangle.X, this.TextRectangle.Y);
+                return;
+            }
 
             foreach (var v in tag.SubLines) {
                 nTempCharIndex = line.IndexOfFirstChar + v.Index;
@@ -642,7 +669,7 @@ namespace ST.Library.UI.STTextBox
             c.IGraphemeSplitter.Each(line.RawString, subLine.Index, (str, nStart, nLen) => {
                 if (nStart >= nCharIndex - line.IndexOfFirstChar) return false;
                 string strChar = str.Substring(nStart, nLen);
-                nWidth += c.GetStringWidth(strChar, c.GetStyleFromCharIndex(line.IndexOfFirstChar + nStart), nWidth);
+                nWidth += c.GetStringWidth(strChar, c.GetStyleFromCharIndex(line.IndexOfFirstChar + subLine.Index + nStart), nWidth);
                 nTempCharIndex = line.IndexOfFirstChar + nStart + nLen;
                 return true;
             });
@@ -656,12 +683,12 @@ namespace ST.Library.UI.STTextBox
         protected override void OnDrawLineSelectionBackground(ISTTextBoxRender render, TextLine line, int nLineIndex, STTextBoxSelectionInfo selection, int nY) {
             var c = base.Core;
             int nRet = 0;
-            //nY += c.TextBox.GetIntYSize(c.TextBox.LineSpacing) / 2;
             if (string.IsNullOrEmpty(line.RawString)) {
                 return;
             }
             int nCharSpacing = c.TextBox.GetIntXSize(c.TextBox.CharSpacing) / 2;
             var tag = _Tag(line);
+            if (tag.SubLines == null) return;
             var temp = tag.ScreenLineOffset < c.Scroll.YValue ? c.Scroll.YValue - tag.ScreenLineOffset : 0;
             for (int i = temp; i < tag.SubLines.Count; i++) {
                 var subLine = tag.SubLines[i];
@@ -681,10 +708,12 @@ namespace ST.Library.UI.STTextBox
                 }
                 if (selection.EndIndex < line.IndexOfFirstChar + subLine.Index + subLine.Length) {
                     int nCurrentIndex = line.IndexOfFirstChar + subLine.Index;
-                    nWidth = this.FindFromCharIndex(render, nLineIndex, selection.EndIndex - line.IndexOfFirstChar).Location.X;
-                    nWidth -= nLeft;
+                    int nRight = this.FindFromCharIndex(render, nLineIndex, selection.EndIndex - line.IndexOfFirstChar).Location.X;
+                    nWidth = nRight - nLeft;
                 }
-                render.FillRectangle(c.TextBox.SelectionColor, nLeft, nY, nWidth, c.LineHeight);
+                if (nWidth > 0) {
+                    render.FillRectangle(c.TextBox.SelectionColor, nLeft, nY, nWidth, c.LineHeight);
+                }
                 nY += c.LineHeight;
                 nRet += c.LineHeight;
                 if (nY >= base.TextRectangle.Bottom) break;
@@ -694,6 +723,7 @@ namespace ST.Library.UI.STTextBox
         public override void OnResize(EventArgs e) {
             base.OnResize(e);
             var c = base.Core;
+            if (c == null) return;
             int nLineOffset = 0;
             c.ITextBoxRender.BeginPaint();
             foreach (TextLine line in c.TextManager) {
@@ -703,22 +733,23 @@ namespace ST.Library.UI.STTextBox
                 nLineOffset += tag.SubLines.Count;
             }
             c.ITextBoxRender.EndPaint();
-            //this.ResizeScroll();
-            //this.SetCaretPostion(c.Caret.IndexOfChar);
+            this.OnCalcScroll(c.Scroll);
         }
 
         public override void OnCalcScroll(STTextBoxScrollInfo scrollInfo) {
             var c = base.Core;
+            if (c == null) return;
             var m = c.TextManager;
+            if (m == null || m.LineCount == 0) return;
             var tag = _Tag(m[m.LineCount - 1]);
-            c.Scroll.MaxYValue = tag.ScreenLineOffset + tag.SubLines.Count - base.TextRectangle.Height / c.LineHeight + 2;
+            int subCount = tag.SubLines != null ? tag.SubLines.Count : 0;
+            c.Scroll.MaxYValue = tag.ScreenLineOffset + subCount - base.TextRectangle.Height / c.LineHeight + 2;
             if (c.Scroll.MaxYValue < 0) {
                 c.Scroll.MaxYValue = 0;
             }
             if (c.Scroll.YValue > c.Scroll.MaxYValue) {
                 c.Scroll.YValue = c.Scroll.MaxYValue;
             }
-            //this.SetCaretPostion(c.Caret.IndexOfChar);
         }
     }
 }

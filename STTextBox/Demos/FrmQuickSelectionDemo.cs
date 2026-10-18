@@ -12,6 +12,7 @@ namespace STTextBoxTest.Demos
         private STTextBox m_tbx;
         private QuickTextView m_quickView;
         private NoWrapTextView m_standardView;
+        private WrapTextView m_wrapView;
         private STTextBoxGDIRender m_gdiRender;
         private STTextBoxGDIPRender m_gdipRender;
 
@@ -21,6 +22,7 @@ namespace STTextBoxTest.Demos
         private ToolStripComboBox m_cboSize;
         private ToolStripComboBox m_cboRenderer;
         private ToolStripComboBox m_cboView;
+        private ToolStripComboBox m_cboAlignment;
         private ToolStripComboBox m_cboTheme;
 
         public FrmQuickSelectionDemo() {
@@ -93,11 +95,28 @@ namespace STTextBoxTest.Demos
             m_cboView.DropDownStyle = ComboBoxStyle.DropDownList;
             m_cboView.Items.AddRange(new object[] {
                 "QuickTextView (Cached & Chunk Drawing)",
-                "NoWrapTextView (Standard)"
+                "NoWrapTextView (Standard)",
+                "WrapTextView (Word Wrap)",
+                "WrapTextView (Char Wrap)"
             });
             m_cboView.SelectedIndex = 0;
             m_cboView.SelectedIndexChanged += (s, ev) => OnViewChanged();
             toolStrip.Items.Add(m_cboView);
+
+            toolStrip.Items.Add(new ToolStripSeparator());
+
+            toolStrip.Items.Add(new ToolStripLabel("Alignment:"));
+            m_cboAlignment = new ToolStripComboBox();
+            m_cboAlignment.DropDownStyle = ComboBoxStyle.DropDownList;
+            m_cboAlignment.Items.AddRange(new object[] {
+                "Left",
+                "Center",
+                "Right"
+            });
+            m_cboAlignment.SelectedIndex = 0;
+            m_cboAlignment.Enabled = false;
+            m_cboAlignment.SelectedIndexChanged += (s, ev) => OnAlignmentChanged();
+            toolStrip.Items.Add(m_cboAlignment);
 
             toolStrip.Items.Add(new ToolStripSeparator());
 
@@ -137,6 +156,8 @@ namespace STTextBoxTest.Demos
 
             m_quickView = new QuickTextView();
             m_standardView = new NoWrapTextView();
+            m_wrapView = new WrapTextView(WrapTextView.Method.Word, WrapTextView.Alignment.Left);
+            m_wrapView.ShowLineNumber = true;
 
             m_gdiRender = new STTextBoxGDIRender();
             m_gdipRender = new STTextBoxGDIPRender();
@@ -186,11 +207,44 @@ namespace STTextBoxTest.Demos
         }
 
         private void OnViewChanged() {
-            if (m_cboView.SelectedIndex == 0) {
-                m_tbx.SetTextView(m_quickView);
-            } else {
-                m_tbx.SetTextView(m_standardView);
+            int viewIndex = m_cboView.SelectedIndex;
+            bool isWrap = viewIndex >= 2;
+            m_cboAlignment.Enabled = isWrap;
+
+            WrapTextView.Alignment alignment = WrapTextView.Alignment.Left;
+            if (m_cboAlignment.SelectedIndex == 1) alignment = WrapTextView.Alignment.Center;
+            else if (m_cboAlignment.SelectedIndex == 2) alignment = WrapTextView.Alignment.Right;
+
+            switch (viewIndex) {
+                case 0:
+                    m_tbx.SetTextView(m_quickView);
+                    break;
+                case 1:
+                    m_tbx.SetTextView(m_standardView);
+                    break;
+                case 2:
+                    m_wrapView.SetWrap(WrapTextView.Method.Word, alignment);
+                    m_tbx.SetTextView(m_wrapView);
+                    break;
+                case 3:
+                    m_wrapView.SetWrap(WrapTextView.Method.Char, alignment);
+                    m_tbx.SetTextView(m_wrapView);
+                    break;
             }
+            m_tbx.Invalidate();
+            UpdateStatus();
+        }
+
+        private void OnAlignmentChanged() {
+            int viewIndex = m_cboView.SelectedIndex;
+            if (viewIndex < 2) return;
+
+            WrapTextView.Alignment alignment = WrapTextView.Alignment.Left;
+            if (m_cboAlignment.SelectedIndex == 1) alignment = WrapTextView.Alignment.Center;
+            else if (m_cboAlignment.SelectedIndex == 2) alignment = WrapTextView.Alignment.Right;
+
+            WrapTextView.Method method = (viewIndex == 2) ? WrapTextView.Method.Word : WrapTextView.Method.Char;
+            m_wrapView.SetWrap(method, alignment);
             m_tbx.Invalidate();
             UpdateStatus();
         }
@@ -292,7 +346,13 @@ namespace STTextBoxTest.Demos
                     m_lblSelection.Text = string.Format(" | Selection: [{0}..{1}] ({2} chars)", c.Selection.StartIndex, c.Selection.EndIndex, c.Selection.Length);
                 }
                 string rendererName = (m_cboRenderer.SelectedIndex == 0) ? "GDI TextRenderer" : "GDI+";
-                string viewName = (m_cboView.SelectedIndex == 0) ? "QuickTextView" : "NoWrapTextView";
+                string viewName = "QuickTextView";
+                switch (m_cboView.SelectedIndex) {
+                    case 0: viewName = "QuickTextView"; break;
+                    case 1: viewName = "NoWrapTextView"; break;
+                    case 2: viewName = string.Format("WrapTextView (Word, {0})", m_cboAlignment.SelectedItem ?? "Left"); break;
+                    case 3: viewName = string.Format("WrapTextView (Char, {0})", m_cboAlignment.SelectedItem ?? "Left"); break;
+                }
                 m_lblStats.Text = string.Format("Mode: {0} + {1} | Total Lines: {2}", rendererName, viewName, c.TextManager.LineCount);
             }
         }

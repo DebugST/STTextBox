@@ -56,6 +56,7 @@ namespace ST.Library.UI.STTextBox
 
         public virtual void Init(STTextBox.Core textBoxCore) {
             this.Core = textBoxCore;
+            this.OnCalcTextRectangle();
             this.OnInitAllText();
         }
 

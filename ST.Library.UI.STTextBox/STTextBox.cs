@@ -98,6 +98,42 @@ namespace ST.Library.UI.STTextBox
             set { _AllowScrollBar = value; }
         }
 
+        [Browsable(true)]
+        [Category("Behavior")]
+        [DefaultValue(false)]
+        [Description("Gets or sets whether text wraps to the next line.")]
+        public bool WordWrap {
+            get {
+                return m_core != null && m_core.ITextView is WrapTextView;
+            }
+            set {
+                if (m_core == null || value == (m_core.ITextView is WrapTextView)) return;
+                if (value) {
+                    this.SetTextView(new WrapTextView(WrapTextView.Method.Word, WrapTextView.Alignment.Left));
+                } else {
+                    this.SetTextView(new QuickTextView());
+                }
+            }
+        }
+
+        [Browsable(true)]
+        [Category("Appearance")]
+        [DefaultValue(WrapTextView.Alignment.Left)]
+        [Description("Gets or sets text alignment when wrapped view is used.")]
+        public WrapTextView.Alignment TextAlignment {
+            get {
+                var wrap = (m_core != null) ? m_core.ITextView as WrapTextView : null;
+                return wrap != null ? wrap.WrapAlignment : WrapTextView.Alignment.Left;
+            }
+            set {
+                var wrap = (m_core != null) ? m_core.ITextView as WrapTextView : null;
+                if (wrap != null) {
+                    wrap.SetWrap(wrap.WrapMethod, value);
+                    this.Invalidate();
+                }
+            }
+        }
+
         private Color _ScrollbarBackColor = Color.FromArgb(40, Color.Gray);
 
         public Color ScrollbarBackColor {

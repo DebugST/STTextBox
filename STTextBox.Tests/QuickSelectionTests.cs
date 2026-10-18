@@ -471,5 +471,101 @@ namespace STTextBox.Tests
                 Assert.Equal(5, fiHit.IndexOfCharInLine);
             }
         }
+
+        [Fact]
+        public void WrapTextView_WordAndCharWrap_Alignments_SetsAndRendersCorrectly()
+        {
+            using (var tbx = new ST.Library.UI.STTextBox.STTextBox()) {
+                var wrapView = new WrapTextView(WrapTextView.Method.Word, WrapTextView.Alignment.Left);
+                tbx.SetTextView(wrapView);
+                tbx.Font = new Font("Consolas", 10.5f);
+                tbx.SetBounds(0, 0, 400, 300);
+
+                string text = "Line 0: This is a long sentence that should easily wrap into multiple sublines on a 400px wide textbox.\r\nLine 1: Short.\r\nLine 2: End.";
+                tbx.SetText(text);
+
+                // Verify Left alignment
+                wrapView.SetWrap(WrapTextView.Method.Word, WrapTextView.Alignment.Left);
+                Assert.Equal(WrapTextView.Alignment.Left, wrapView.WrapAlignment);
+                Assert.Equal(WrapTextView.Method.Word, wrapView.WrapMethod);
+
+                FindInfo fi0 = wrapView.FindFromCharIndex(0);
+                Assert.True(fi0.Find);
+                Assert.Equal(0, fi0.IndexOfLine);
+
+                // Verify Center alignment
+                wrapView.SetWrap(WrapTextView.Method.Word, WrapTextView.Alignment.Center);
+                Assert.Equal(WrapTextView.Alignment.Center, wrapView.WrapAlignment);
+
+                // Verify Right alignment
+                wrapView.SetWrap(WrapTextView.Method.Word, WrapTextView.Alignment.Right);
+                Assert.Equal(WrapTextView.Alignment.Right, wrapView.WrapAlignment);
+
+                // Verify Char wrap method
+                wrapView.SetWrap(WrapTextView.Method.Char, WrapTextView.Alignment.Left);
+                Assert.Equal(WrapTextView.Method.Char, wrapView.WrapMethod);
+
+                // Hit test should succeed without exception
+                FindInfo fiHit = wrapView.FindFromPoint(new Point(100, 20));
+                Assert.True(fiHit.Find);
+            }
+        }
+
+        [Fact]
+        public void WrapTextView_Selection_AcrossWrappedSublines_RendersWithoutErrors()
+        {
+            using (var tbx = new ST.Library.UI.STTextBox.STTextBox()) {
+                var wrapView = new WrapTextView(WrapTextView.Method.Word, WrapTextView.Alignment.Left);
+                tbx.SetTextView(wrapView);
+                tbx.Font = new Font("Consolas", 10.5f);
+                tbx.SetBounds(0, 0, 400, 300);
+
+                string text = "First line is somewhat short.\r\nSecond line is a very long line that wraps across multiple sublines so that selection can test subline boundaries.\r\nThird line.";
+                tbx.SetText(text);
+
+                // Select from middle of line 1 across wrapped line 2
+                var core = typeof(ST.Library.UI.STTextBox.STTextBox).GetField("m_core", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(tbx) as ST.Library.UI.STTextBox.STTextBox.Core;
+                core.Selection.SetSelection(10, 80);
+                wrapView.SetCaretPostion(80);
+
+                // Test drawing to bitmap in Left, Center, Right alignments
+                foreach (WrapTextView.Alignment align in new[] { WrapTextView.Alignment.Left, WrapTextView.Alignment.Center, WrapTextView.Alignment.Right }) {
+                    wrapView.SetWrap(WrapTextView.Method.Word, align);
+                    using (var bmp = new Bitmap(tbx.Width, tbx.Height)) {
+                        tbx.DrawToBitmap(bmp, new Rectangle(0, 0, tbx.Width, tbx.Height));
+                        Assert.NotNull(bmp);
+                    }
+                }
+
+                // Caret at very end of line / text
+                wrapView.SetCaretPostion(text.Length);
+                Assert.Equal(text.Length, core.Caret.IndexOfChar);
+            }
+        }
+
+        [Fact]
+        public void STTextBox_WordWrapAndTextAlignment_Properties_WorkCorrectly()
+        {
+            using (var tbx = new ST.Library.UI.STTextBox.STTextBox()) {
+                // By default WordWrap is false
+                Assert.False(tbx.WordWrap);
+                Assert.Equal(WrapTextView.Alignment.Left, tbx.TextAlignment);
+
+                // Turn WordWrap on
+                tbx.WordWrap = true;
+                Assert.True(tbx.WordWrap);
+
+                // Set Alignment
+                tbx.TextAlignment = WrapTextView.Alignment.Center;
+                Assert.Equal(WrapTextView.Alignment.Center, tbx.TextAlignment);
+
+                tbx.TextAlignment = WrapTextView.Alignment.Right;
+                Assert.Equal(WrapTextView.Alignment.Right, tbx.TextAlignment);
+
+                // Turn WordWrap off
+                tbx.WordWrap = false;
+                Assert.False(tbx.WordWrap);
+            }
+        }
     }
 }
