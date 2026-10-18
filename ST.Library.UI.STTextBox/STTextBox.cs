@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -61,7 +61,7 @@ namespace ST.Library.UI.STTextBox
             }
         }
 
-        private Color _SelectionColor = Color.FromArgb(125, Color.DarkGray);
+        private Color _SelectionColor = Color.FromArgb(0, 120, 215);
 
         public Color SelectionColor {
             get { return _SelectionColor; }
@@ -70,6 +70,21 @@ namespace ST.Library.UI.STTextBox
                     return;
                 }
                 _SelectionColor = value;
+                if (!m_core.Selection.IsEmptySelection) {
+                    this.Invalidate();
+                }
+            }
+        }
+
+        private Color _SelectedTextColor = Color.White;
+
+        public Color SelectedTextColor {
+            get { return _SelectedTextColor; }
+            set {
+                if (value == _SelectedTextColor) {
+                    return;
+                }
+                _SelectedTextColor = value;
                 if (!m_core.Selection.IsEmptySelection) {
                     this.Invalidate();
                 }

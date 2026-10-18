@@ -1,4 +1,4 @@
-﻿namespace STTextBoxTest
+namespace STTextBoxTest
 {
     partial class FrmDemo
     {
@@ -34,6 +34,7 @@
             this.btn_invisablechar = new System.Windows.Forms.Button();
             this.btn_about_code = new System.Windows.Forms.Button();
             this.btn_about = new System.Windows.Forms.Button();
+            this.btn_quick_selection = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // btn_single
@@ -108,12 +109,21 @@
             this.btn_about_code.Text = "About Code";
             this.btn_about_code.UseVisualStyleBackColor = true;
             // 
+            // btn_quick_selection
+            // 
+            this.btn_quick_selection.Location = new System.Drawing.Point(40, 128);
+            this.btn_quick_selection.Name = "btn_quick_selection";
+            this.btn_quick_selection.Size = new System.Drawing.Size(212, 25);
+            this.btn_quick_selection.TabIndex = 8;
+            this.btn_quick_selection.Text = "Quick Selection (Fast Demo)";
+            this.btn_quick_selection.UseVisualStyleBackColor = true;
+            // 
             // btn_about
             // 
-            this.btn_about.Location = new System.Drawing.Point(91, 128);
+            this.btn_about.Location = new System.Drawing.Point(91, 158);
             this.btn_about.Name = "btn_about";
             this.btn_about.Size = new System.Drawing.Size(110, 23);
-            this.btn_about.TabIndex = 8;
+            this.btn_about.TabIndex = 9;
             this.btn_about.Text = "About STTextBox";
             this.btn_about.UseVisualStyleBackColor = true;
             // 
@@ -121,7 +131,8 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(292, 158);
+            this.ClientSize = new System.Drawing.Size(292, 190);
+            this.Controls.Add(this.btn_quick_selection);
             this.Controls.Add(this.btn_about);
             this.Controls.Add(this.btn_about_code);
             this.Controls.Add(this.btn_invisablechar);
@@ -148,5 +159,6 @@
         private System.Windows.Forms.Button btn_invisablechar;
         private System.Windows.Forms.Button btn_about_code;
         private System.Windows.Forms.Button btn_about;
+        private System.Windows.Forms.Button btn_quick_selection;
     }
 }

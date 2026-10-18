@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using System.Drawing;
 
 namespace ST.Library.UI.STTextBox
 {
@@ -46,23 +47,39 @@ namespace ST.Library.UI.STTextBox
                 return;
             }
 
+            m_last_sel_region = Rectangle.Empty;
             var fi = c.ITextView.SetCaretPostion(e.Location);// c.ITextView.FindFromPoint(e.Location);
             //c.Caret.CopyFromFindInfo(fi);
             if (Control.ModifierKeys != Keys.Shift) {
                 c.Selection.SetIndex(c.Caret.IndexOfChar);
             } else {
-                //if (c.Caret.IndexOfChar < c.Selection.AnchorIndex) {
-                //    //c.Selection.StartIndex = c.Caret.IndexOfChar;
-                //    //c.Selection.EndIndex = c.Selection.AnchorIndex;
-                //    c.Selection.SetSelection(c.Selection.AnchorIndex, c.Caret.IndexOfChar);
-                //} else {
-                //    c.Selection.StartIndex = c.Selection.AnchorIndex;
-                //    c.Selection.EndIndex = c.Caret.IndexOfChar;
-                //}
                 c.Selection.SetSelection(c.Selection.AnchorIndex, c.Caret.IndexOfChar);
             }
-            //c.ITextView.SetCaretPostion(c.Caret.X, c.Caret.Y);
             this.Invalidate();
+        }
+
+        private Rectangle m_last_sel_region = Rectangle.Empty;
+
+        public void InvalidateSelectionChange(int oldLine, int newLine) {
+            var c = m_core;
+            int minLine = Math.Min(oldLine, newLine);
+            int maxLine = Math.Max(oldLine, newLine);
+            int lineHeight = c.LineHeight;
+            Point ptTop = c.ITextView.ViewToControl(new Point(0, minLine * lineHeight));
+            int startY = ptTop.Y - 2;
+            int height = ((maxLine - minLine + 1) * lineHeight) + 4;
+            startY = Math.Max(c.ViewRectangle.Top, startY);
+            height = Math.Min(height, c.ViewRectangle.Bottom - startY);
+            if (height <= 0) {
+                this.Invalidate();
+                return;
+            }
+            Rectangle rect = new Rectangle(c.ViewRectangle.Left, startY, c.ViewRectangle.Width, height);
+            if (!m_last_sel_region.IsEmpty && Math.Abs(m_last_sel_region.Y - rect.Y) <= lineHeight * 3) {
+                rect = Rectangle.Union(m_last_sel_region, rect);
+            }
+            m_last_sel_region = rect;
+            this.Invalidate(rect);
         }
 
         protected override void OnMouseMove(MouseEventArgs e) {
@@ -79,27 +96,20 @@ namespace ST.Library.UI.STTextBox
                     return;
             }
             if (e.Button == System.Windows.Forms.MouseButtons.Left) {
-                //var sw = new System.Diagnostics.Stopwatch();
-                //sw.Start();
                 var fi = c.ITextView.FindFromPoint(e.Location);
                 if (!fi.Find) return;
+                int oldLine = c.Caret.IndexOfLine;
                 c.Caret.CopyFromFindInfo(fi);
                 int nIndex = c.Caret.IndexOfChar;
-                //if (nIndex > c.Selection.AnchorIndex) {
-                //    c.Selection.SetSelection(c.Selection.AnchorIndex, nIndex);
-                //    //c.Selection.StartIndex = c.Selection.AnchorIndex;
-                //    //c.Selection.EndIndex = nIndex;
-                //} else {
-                //    c.Selection.SetSelection(nIndex, c.Selection.AnchorIndex);
-                //    //c.Selection.StartIndex = nIndex;
-                //    //c.Selection.EndIndex = c.Selection.AnchorIndex;
-                //}
                 c.Selection.SetSelection(c.Selection.AnchorIndex, nIndex);
                 c.ITextView.SetCaretPostion(fi.IndexOfChar);
-                c.ITextView.ScrollToCaret();
-                //sw.Stop();
-                //Console.WriteLine("CheckSelection: - " + sw.ElapsedMilliseconds);
-                this.Invalidate();
+                bool scrolled = c.ITextView.ScrollToCaret();
+                if (scrolled) {
+                    m_last_sel_region = Rectangle.Empty;
+                    this.Invalidate();
+                } else {
+                    this.InvalidateSelectionChange(oldLine, c.Caret.IndexOfLine);
+                }
                 return;
             }
             if (e.Button == MouseButtons.None && c.Scroll.CountDown != 0) {
@@ -127,6 +137,7 @@ namespace ST.Library.UI.STTextBox
 
         protected override void OnMouseUp(MouseEventArgs e) {
             base.OnMouseUp(e);
+            m_last_sel_region = Rectangle.Empty;
             var c = m_core;
             c.Scroll.DownScrollBar = STTextBoxScrollInfo.ScrollBarType.None;
             this.Invalidate();

@@ -47,8 +47,10 @@
     <Compile Include="Implementation\StyleMonitor\LinkStyleMonitor.cs" />
     <Compile Include="Implementation\StyleMonitor\SelectionStyleMonitor.cs" />
     <Compile Include="Implementation\STTextBoxGDIPRender.cs" />
+    <Compile Include="Implementation\STTextBoxGDIRender.cs" />
     <Compile Include="Implementation\TextHistory.cs" />
     <Compile Include="Implementation\TextView\NoWrapTextView.cs" />
+    <Compile Include="Implementation\TextView\QuickTextView.cs" />
     <Compile Include="Implementation\TextStyleMonitor.cs" />
     <Compile Include="Implementation\TextView\SingleTextView.cs" />
     <Compile Include="Implementation\TextView\TextView.cs" />

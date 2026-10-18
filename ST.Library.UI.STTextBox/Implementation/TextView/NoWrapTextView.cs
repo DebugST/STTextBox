@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -246,7 +246,11 @@ namespace ST.Library.UI.STTextBox
                     bool bSelected = nCurrentCharIndex >= c.Selection.StartIndex && nCurrentCharIndex < c.Selection.EndIndex;
                     c.IEmojiRender.DrawEmoji(render, strChar, rect_char.X + (nCharSpacing >> 1), nY + nLineSpacing, c.FontHeight, bSelected);
                 } else {
-                    c.ITextBoxRender.DrawString(strChar, c.GetStyleFromCharIndex(nCurrentCharIndex), rect_char);
+                    var style = c.GetStyleFromCharIndex(nCurrentCharIndex);
+                    if (!c.Selection.IsEmptySelection && nCurrentCharIndex >= c.Selection.StartIndex && nCurrentCharIndex < c.Selection.EndIndex && c.TextBox.SelectedTextColor != Color.Empty) {
+                        style.ForeColor = c.TextBox.SelectedTextColor;
+                    }
+                    c.ITextBoxRender.DrawString(strChar, style, rect_char);
                 }
                 if (rect_char.Right > base.TextRectangle.Right) {
                     return false;
