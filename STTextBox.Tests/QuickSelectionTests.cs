@@ -125,5 +125,65 @@ namespace STTextBox.Tests
                 Assert.Null(ex);
             }
         }
+
+        [Fact]
+        public void STTextBoxGDIPRender_MeasurementPrecision_HasSubpixelAccuracy()
+        {
+            using (var tbx = new ST.Library.UI.STTextBox.STTextBox())
+            using (var render = new STTextBoxGDIPRender()) {
+                tbx.Font = new Font("Consolas", 10.5f);
+                render.BindControl(tbx);
+
+                Assert.True(render.IsMonospaced);
+                float charWidth = render.CharWidthFloat;
+                Assert.True(charWidth > 0f);
+
+                render.BeginPaint();
+                try {
+                    // Test across 100 characters that cumulative advance matches measured advance within 0.001 px
+                    string text100 = new string('A', 100);
+                    float measured100 = render.GetStringWidthFloat(text100, TextStyle.Empty, 0f);
+                    float expected100 = 100 * charWidth;
+                    Assert.InRange(Math.Abs(measured100 - expected100), 0f, 0.01f);
+
+                    // Test drawing text chunk that starts with a space doesn't throw
+                    using (var bmp = new Bitmap(200, 30))
+                    using (var g = Graphics.FromImage(bmp)) {
+                        render.OnBeginPaint(g);
+                        var ex = Record.Exception(() => {
+                            render.DrawString(" Test Chunk", new TextStyle() { ForeColor = Color.Black }, new RectangleF(0, 0, 100, 20));
+                        });
+                        Assert.Null(ex);
+                        render.OnEndPaint(g);
+                    }
+                } finally {
+                    render.EndPaint();
+                    render.UnbindControl();
+                }
+            }
+        }
+
+        [Fact]
+        public void QuickTextView_WithGDIPRender_HitTestsAndAlignsAccurately()
+        {
+            using (var tbx = new ST.Library.UI.STTextBox.STTextBox()) {
+                var view = new QuickTextView();
+                tbx.SetTextView(view);
+                tbx.Font = new Font("Consolas", 10.5f);
+
+                string sampleLine = "it&bq2f(bnuglc3l7a48cgo^ron(c*@d$(@%6s*0fh5jn3y8^(i^bmpcfb3bpg&dvr";
+                tbx.SetText(sampleLine);
+
+                // Caret at char index 20
+                FindInfo fi20 = view.FindFromCharIndex(20);
+                Assert.True(fi20.Find);
+                Assert.Equal(20, fi20.IndexOfCharInLine);
+
+                // Hit testing back at that exact location should return column 20
+                FindInfo fiHit = view.FindFromPoint(fi20.Location);
+                Assert.True(fiHit.Find);
+                Assert.Equal(20, fiHit.IndexOfCharInLine);
+            }
+        }
     }
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -19,6 +19,7 @@ namespace ST.Library.UI.STTextBox
         public int SpaceWidth { get; private set; }
         public int FontHeight { get; private set; }
         public bool IsMonospaced { get; private set; }
+        public float CharWidthFloat { get; private set; }
 
         private Font m_ft_normal;
         private Font m_ft_bold;
@@ -42,8 +43,8 @@ namespace ST.Library.UI.STTextBox
             this.TabSize = 4;
             m_dic_width_cache = new Dictionary<string, int>();
             m_sf = new StringFormat(StringFormat.GenericTypographic);
-            m_sf.FormatFlags |= StringFormatFlags.MeasureTrailingSpaces;
-            m_sf.Alignment = StringAlignment.Center;
+            m_sf.FormatFlags |= StringFormatFlags.MeasureTrailingSpaces | StringFormatFlags.NoWrap;
+            m_sf.Alignment = StringAlignment.Near;
             m_sf.LineAlignment = StringAlignment.Center;
             m_brush = new SolidBrush(Color.Black);
             this.InVisableCharColor = Color.FromArgb(50, Color.Magenta);
@@ -111,7 +112,18 @@ namespace ST.Library.UI.STTextBox
         }
 
         public int GetTabWidth(int nLeftWidth) {
-            return (int)Math.Round(this.GetSpaceWidth() * this.GetTabSpaceCount(nLeftWidth, this.TabSize));
+            return (int)Math.Round(this.GetTabWidthFloat(nLeftWidth));
+        }
+
+        public float GetTabWidthFloat(float fLeftWidth) {
+            float fSpaceWidth = this.CharWidthFloat > 0 ? this.CharWidthFloat : (float)this.SpaceWidth;
+            if (this.TabSize == 1) {
+                return fSpaceWidth;
+            }
+            float fTabFullWidth = fSpaceWidth * this.TabSize;
+            float fSpaceCount = (fTabFullWidth - (fLeftWidth % fTabFullWidth)) / fSpaceWidth;
+            if (fSpaceCount < 1f) fSpaceCount += this.TabSize;
+            return fSpaceCount * fSpaceWidth;
         }
 
         public int GetFontHeight() { return this.FontHeight; }
@@ -136,28 +148,24 @@ namespace ST.Library.UI.STTextBox
         }
 
         public int GetStringWidth(string strText, TextStyle style, int nLeftWidth, bool bCache) {
+            return (int)Math.Ceiling(this.GetStringWidthFloat(strText, style, (float)nLeftWidth));
+        }
+
+        public float GetStringWidthFloat(string strText, TextStyle style, float fLeftWidth) {
             if (string.IsNullOrEmpty(strText) || m_ft_normal == null) {
-                return 0;
+                return 0f;
+            }
+            if (strText == "\t") {
+                return this.GetTabWidthFloat(fLeftWidth);
             }
             Graphics g = this.GetGraphics();
             string strKey = this.GetFontFlag(style);
             Font ft = this.GetFontFromFlag(strKey);
-            strKey += ":" + strText;
-            if (m_dic_width_cache.ContainsKey(strKey)) {
-                return m_dic_width_cache[strKey];
-            }
-            if (strText == "\t") {
-                return this.GetTabWidth(nLeftWidth);
-            }
             float fWidth = g.MeasureString(strText, ft, 10000, m_sf).Width;
             if ((ft.Style & FontStyle.Italic) == FontStyle.Italic) {
                 fWidth += m_italic_width;
             }
-            int nWidth = (int)Math.Ceiling(fWidth);
-            if (bCache) {
-                m_dic_width_cache.Add(strKey, nWidth);
-            }
-            return nWidth;
+            return fWidth;
         }
 
         public void DrawString(string strText, Font ft, Color color, Rectangle rect, StringFormat sf) {
@@ -166,40 +174,41 @@ namespace ST.Library.UI.STTextBox
         }
 
         public void DrawString(string strText, TextStyle style, Rectangle rect) {
+            this.DrawString(strText, style, (RectangleF)rect);
+        }
+
+        public void DrawString(string strText, TextStyle style, RectangleF rect) {
             Graphics g = this.GetGraphics();
-            m_rect_line.X = rect.X;
-            m_rect_line.Width = rect.Width;
             if (style.BackColor.A > 0) {
                 m_brush.Color = style.BackColor;
                 g.FillRectangle(m_brush, rect);
             }
             if ((style.FontStyle & FontStyle.Underline) == FontStyle.Underline && style.UnderLineColor.A > 0) {
-                m_rect_line.Y = rect.Bottom - m_rect_line.Height;
                 m_brush.Color = style.UnderLineColor;
-                g.FillRectangle(m_brush, m_rect_line);
+                g.FillRectangle(m_brush, rect.X, rect.Bottom - m_rect_line.Height, rect.Width, (float)m_rect_line.Height);
             }
             if (style.ForeColor.A > 0) {
                 m_brush.Color = style.ForeColor;
-                switch (strText[0]) {
-                    case ' ':
-                        if (this.ShowInVisableChar) this.OnDrawSpaceChar(rect);
-                        return;
-                    case '\t':
-                        if (this.ShowInVisableChar) this.OnDrawTabChar(rect);
-                        return;
-                    case '\r':
-                    case '\n':
-                        if (this.ShowInVisableChar) this.OnDrawNewLineChar(rect);
-                        return;
-                    default:
-                        g.DrawString(strText, this.GetFontFromFlag(this.GetFontFlag(style)), m_brush, rect, m_sf);
-                        break;
+                if (strText.Length == 1) {
+                    Rectangle intRect = Rectangle.Round(rect);
+                    switch (strText[0]) {
+                        case ' ':
+                            if (this.ShowInVisableChar) this.OnDrawSpaceChar(intRect);
+                            return;
+                        case '\t':
+                            if (this.ShowInVisableChar) this.OnDrawTabChar(intRect);
+                            return;
+                        case '\r':
+                        case '\n':
+                            if (this.ShowInVisableChar) this.OnDrawNewLineChar(intRect);
+                            return;
+                    }
                 }
+                g.DrawString(strText, this.GetFontFromFlag(this.GetFontFlag(style)), m_brush, rect, m_sf);
             }
             if ((style.FontStyle & FontStyle.Strikeout) == FontStyle.Strikeout && style.StrikeOutColor.A > 0) {
-                m_rect_line.Y = rect.Y + rect.Height / 2;
                 m_brush.Color = style.StrikeOutColor;
-                g.FillRectangle(m_brush, m_rect_line);
+                g.FillRectangle(m_brush, rect.X, rect.Y + rect.Height / 2f, rect.Width, (float)m_rect_line.Height);
             }
         }
 
@@ -302,6 +311,10 @@ namespace ST.Library.UI.STTextBox
             m_ft_bold_italic = new Font(ft, FontStyle.Bold | FontStyle.Italic);
             this.FontHeight = ft.Height;
             m_dic_width_cache.Clear();
+
+            Graphics g = this.GetGraphics();
+            this.CharWidthFloat = g.MeasureString("W", ft, 10000, m_sf).Width;
+
             //SPACE are used to calculate TAB width.
             int nWidth = this.GetStringWidth(" ", TextStyle.Empty, 0);
             m_dic_width_cache.Add(" ", nWidth);
@@ -309,7 +322,9 @@ namespace ST.Library.UI.STTextBox
             m_dic_width_cache.Add("\n", nWidth);
             m_dic_width_cache.Add("\r\n", nWidth);
             this.SpaceWidth = nWidth;
-            this.IsMonospaced = this.GetStringWidth("i", TextStyle.Empty, 0) == this.GetStringWidth("W", TextStyle.Empty, 0);
+
+            float fIWidth = g.MeasureString("i", ft, 10000, m_sf).Width;
+            this.IsMonospaced = Math.Abs(fIWidth - this.CharWidthFloat) < 0.001f;
             if (!this.IsMonospaced) {
                 m_italic_width = (float)(this.FontHeight * Math.Tan(12 * Math.PI / 180));
             } else {

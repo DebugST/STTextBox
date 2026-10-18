@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -54,7 +54,7 @@ namespace ST.Library.UI.STTextBox
 
         public abstract int GetCurrentCharOffset();
 
-        public void Init(STTextBox.Core textBoxCore) {
+        public virtual void Init(STTextBox.Core textBoxCore) {
             this.Core = textBoxCore;
             this.OnInitAllText();
         }

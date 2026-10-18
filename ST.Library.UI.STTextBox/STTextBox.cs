@@ -302,6 +302,18 @@ namespace ST.Library.UI.STTextBox
             return m_core.TextManager.SetText(nIndex, nLen, strText);
         }
 
+        public void Select(int nStart, int nLength) {
+            if (nStart < 0) nStart = 0;
+            if (nLength < 0) nLength = 0;
+            int nMax = m_core.TextManager.TextLength;
+            if (nStart > nMax) nStart = nMax;
+            if (nStart + nLength > nMax) nLength = nMax - nStart;
+            m_core.Selection.SetSelection(nStart, nStart + nLength);
+            m_core.Caret.IndexOfChar = m_core.Selection.EndIndex;
+            m_core.ITextView.SetCaretPostion(m_core.Caret.IndexOfChar);
+            this.Invalidate();
+        }
+
         public void SelectAll() {
             m_core.Selection.SetSelection(0, m_core.TextManager.TextLength);
             m_core.Caret.IndexOfChar = m_core.Selection.EndIndex;

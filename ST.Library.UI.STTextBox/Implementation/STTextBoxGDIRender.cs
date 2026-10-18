@@ -25,6 +25,7 @@ namespace ST.Library.UI.STTextBox
         public int SpaceWidth { get; private set; }
         public int FontHeight { get; private set; }
         public bool IsMonospaced { get; private set; }
+        public float CharWidthFloat { get { return (float)this.SpaceWidth; } }
 
         private Font m_ft_normal;
         private Font m_ft_bold;
@@ -137,6 +138,10 @@ namespace ST.Library.UI.STTextBox
             return width;
         }
 
+        public float GetStringWidthFloat(string strText, TextStyle style, float fLeftWidth) {
+            return (float)this.GetStringWidth(strText, style, (int)fLeftWidth);
+        }
+
         public void SetClip(Rectangle rect) {
             GetGraphics().SetClip(rect);
         }
@@ -154,6 +159,10 @@ namespace ST.Library.UI.STTextBox
             TextRenderer.DrawText(GetGraphics(), strText, ft ?? m_ft_normal, rect.Location, color, TEXT_FORMAT_FLAGS);
         }
 
+        public void DrawString(string strText, TextStyle style, RectangleF rect) {
+            this.DrawString(strText, style, Rectangle.Round(rect));
+        }
+
         public void DrawString(string strText, TextStyle style, Rectangle rect) {
             if (string.IsNullOrEmpty(strText)) return;
             Graphics g = GetGraphics();
@@ -166,22 +175,22 @@ namespace ST.Library.UI.STTextBox
                 g.FillRectangle(m_brush, rect.X, rect.Bottom - 1, rect.Width, 1);
             }
             if (style.ForeColor.A > 0) {
-                switch (strText[0]) {
-                    case ' ':
-                        if (this.ShowInVisableChar) OnDrawSpaceChar(rect);
-                        return;
-                    case '\t':
-                        if (this.ShowInVisableChar) OnDrawTabChar(rect);
-                        return;
-                    case '\r':
-                    case '\n':
-                        if (this.ShowInVisableChar) OnDrawNewLineChar(rect);
-                        return;
-                    default:
-                        Font ft = GetFontFromFlag(GetFontFlag(style));
-                        TextRenderer.DrawText(g, strText, ft, rect.Location, style.ForeColor, TEXT_FORMAT_FLAGS);
-                        break;
+                if (strText.Length == 1) {
+                    switch (strText[0]) {
+                        case ' ':
+                            if (this.ShowInVisableChar) OnDrawSpaceChar(rect);
+                            return;
+                        case '\t':
+                            if (this.ShowInVisableChar) OnDrawTabChar(rect);
+                            return;
+                        case '\r':
+                        case '\n':
+                            if (this.ShowInVisableChar) OnDrawNewLineChar(rect);
+                            return;
+                    }
                 }
+                Font ft = GetFontFromFlag(GetFontFlag(style));
+                TextRenderer.DrawText(g, strText, ft, rect.Location, style.ForeColor, TEXT_FORMAT_FLAGS);
             }
             if ((style.FontStyle & FontStyle.Strikeout) == FontStyle.Strikeout && style.StrikeOutColor.A > 0) {
                 m_brush.Color = style.StrikeOutColor;

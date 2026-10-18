@@ -16,8 +16,8 @@ namespace ST.Library.UI.STTextBox
     {
         private const int LINE_OVERLAP_MARGIN = 1;
         private int m_nMaxLineWidth;
-        private readonly Dictionary<int, int[]> m_dic_line_widths = new Dictionary<int, int[]>();
-        private readonly Dictionary<char, int> m_dic_char_widths = new Dictionary<char, int>();
+        private readonly Dictionary<int, float[]> m_dic_line_widths = new Dictionary<int, float[]>();
+        private readonly Dictionary<char, float> m_dic_char_widths = new Dictionary<char, float>();
 
         private readonly StringFormat m_sf = new StringFormat(StringFormat.GenericTypographic) {
             Alignment = StringAlignment.Far,
@@ -26,6 +26,16 @@ namespace ST.Library.UI.STTextBox
 
         public QuickTextView() {
             this.ShowLineNumber = true;
+        }
+
+        public override void Init(STTextBox.Core core) {
+            base.Init(core);
+            if (core != null && core.TextBox != null) {
+                core.TextBox.FontChanged += (s, e) => {
+                    m_dic_line_widths.Clear();
+                    m_dic_char_widths.Clear();
+                };
+            }
         }
 
         public override void OnInitAllText() {
@@ -77,8 +87,8 @@ namespace ST.Library.UI.STTextBox
             TextLine line = c.TextManager[nIndexLine];
             fi.Line = line;
             fi.IndexOfLine = nIndexLine;
-            int[] widths = GetOrCreateLineWidthCache(nIndexLine, line.RawString);
-            int targetX = pt.X - base.TextRectangle.Left + c.Scroll.XOffset;
+            float[] widths = GetOrCreateLineWidthCache(nIndexLine, line.RawString);
+            float targetX = (float)(pt.X - base.TextRectangle.Left + c.Scroll.XOffset);
 
             // Fast binary search for column
             int col = 0;
@@ -93,8 +103,8 @@ namespace ST.Library.UI.STTextBox
                 }
             }
             if (col < widths.Length - 1) {
-                int charWidth = widths[col + 1] - widths[col];
-                if (targetX - widths[col] > (charWidth >> 1)) {
+                float charWidth = widths[col + 1] - widths[col];
+                if (targetX - widths[col] > (charWidth * 0.5f)) {
                     col++;
                 }
             }
@@ -106,7 +116,7 @@ namespace ST.Library.UI.STTextBox
             }
 
             fi.IndexOfCharInLine = col;
-            int finalX = base.TextRectangle.Left - c.Scroll.XOffset + widths[col];
+            int finalX = base.TextRectangle.Left - c.Scroll.XOffset + (int)Math.Round(widths[col]);
             int finalY = base.TextRectangle.Y + (nIndexLine - c.Scroll.YValue) * c.LineHeight;
             fi.Location = new Point(finalX, finalY);
             fi.Find = true;
@@ -121,9 +131,9 @@ namespace ST.Library.UI.STTextBox
             }
             TextLine line = c.TextManager[nLineIndex];
             int col = nIndex - line.IndexOfFirstChar;
-            int[] widths = GetOrCreateLineWidthCache(nLineIndex, line.RawString);
+            float[] widths = GetOrCreateLineWidthCache(nLineIndex, line.RawString);
             int colClamped = Math.Max(0, Math.Min(col, widths.Length - 1));
-            int x = base.TextRectangle.Left - c.Scroll.XOffset + widths[colClamped];
+            int x = base.TextRectangle.Left - c.Scroll.XOffset + (int)Math.Round(widths[colClamped]);
             int y = base.TextRectangle.Y + (nLineIndex - c.Scroll.YValue) * c.LineHeight;
             return new FindInfo() {
                 Line = line,
@@ -153,9 +163,9 @@ namespace ST.Library.UI.STTextBox
             int selEndCol = Math.Min(lineLen, selection.EndIndex - lineStart);
             if (selEndCol <= selStartCol) return;
 
-            int[] widths = GetOrCreateLineWidthCache(nLineIndex, line.RawString);
-            int selStartX = base.TextRectangle.Left - c.Scroll.XOffset + widths[selStartCol];
-            int selEndX = base.TextRectangle.Left - c.Scroll.XOffset + widths[selEndCol];
+            float[] widths = GetOrCreateLineWidthCache(nLineIndex, line.RawString);
+            int selStartX = base.TextRectangle.Left - c.Scroll.XOffset + (int)Math.Round(widths[selStartCol]);
+            int selEndX = base.TextRectangle.Left - c.Scroll.XOffset + (int)Math.Round(widths[selEndCol]);
             int selWidth = selEndX - selStartX;
             if (selWidth <= 0) return;
 
@@ -176,17 +186,19 @@ namespace ST.Library.UI.STTextBox
             if (drawLength == 0) return c.LineHeight;
 
             int lineIndex = c.TextManager.GetLineIndexFromCharIndex(line.IndexOfFirstChar);
-            int[] widths = GetOrCreateLineWidthCache(lineIndex, raw);
+            float[] widths = GetOrCreateLineWidthCache(lineIndex, raw);
 
             int lineStart = line.IndexOfFirstChar;
             int lineEnd = lineStart + drawLength;
 
             bool isSelected = !c.Selection.IsEmptySelection && !(lineStart >= c.Selection.EndIndex || lineEnd <= c.Selection.StartIndex);
 
+            float baseX = (float)(nX - c.Scroll.XOffset);
+
             if (!isSelected) {
                 // Entire line unselected: Draw as single chunk
                 string text = raw.Substring(0, drawLength);
-                DrawTextChunk(render, text, nX - c.Scroll.XOffset, nY, widths[drawLength], false);
+                DrawTextChunk(render, text, baseX, nY, widths[drawLength], false);
                 return c.LineHeight;
             }
 
@@ -196,7 +208,7 @@ namespace ST.Library.UI.STTextBox
             // Fully selected line
             if (selStartCol == 0 && selEndCol == drawLength) {
                 string text = raw.Substring(0, drawLength);
-                DrawTextChunk(render, text, nX - c.Scroll.XOffset, nY, widths[drawLength], true);
+                DrawTextChunk(render, text, baseX, nY, widths[drawLength], true);
                 return c.LineHeight;
             }
 
@@ -204,30 +216,30 @@ namespace ST.Library.UI.STTextBox
             // 1. Unselected prefix
             if (selStartCol > 0) {
                 string prefix = raw.Substring(0, selStartCol);
-                DrawTextChunk(render, prefix, nX - c.Scroll.XOffset, nY, widths[selStartCol], false);
+                DrawTextChunk(render, prefix, baseX, nY, widths[selStartCol], false);
             }
 
             // 2. Selected middle chunk
             if (selEndCol > selStartCol) {
                 string selectedText = raw.Substring(selStartCol, selEndCol - selStartCol);
-                int selX = nX - c.Scroll.XOffset + widths[selStartCol];
-                int selW = widths[selEndCol] - widths[selStartCol];
+                float selX = baseX + widths[selStartCol];
+                float selW = widths[selEndCol] - widths[selStartCol];
                 DrawTextChunk(render, selectedText, selX, nY, selW, true);
             }
 
             // 3. Unselected suffix
             if (selEndCol < drawLength) {
                 string suffix = raw.Substring(selEndCol, drawLength - selEndCol);
-                int suffX = nX - c.Scroll.XOffset + widths[selEndCol];
-                int suffW = widths[drawLength] - widths[selEndCol];
+                float suffX = baseX + widths[selEndCol];
+                float suffW = widths[drawLength] - widths[selEndCol];
                 DrawTextChunk(render, suffix, suffX, nY, suffW, false);
             }
 
             return c.LineHeight;
         }
 
-        private void DrawTextChunk(ISTTextBoxRender render, string text, int x, int y, int width, bool isSelected) {
-            if (string.IsNullOrEmpty(text) || width <= 0) return;
+        private void DrawTextChunk(ISTTextBoxRender render, string text, float x, float y, float width, bool isSelected) {
+            if (string.IsNullOrEmpty(text) || width <= 0f) return;
             var c = base.Core;
             TextStyle style = new TextStyle();
             if (isSelected) {
@@ -235,7 +247,7 @@ namespace ST.Library.UI.STTextBox
             } else {
                 style.ForeColor = c.TextBox.ForeColor;
             }
-            render.DrawString(text, style, new Rectangle(x, y, width, c.LineHeight));
+            render.DrawString(text, style, new RectangleF(x, y, width, (float)c.LineHeight));
         }
 
         protected override void OnDrawHead(ISTTextBoxRender render, int nStartLineIndex) {
@@ -259,25 +271,30 @@ namespace ST.Library.UI.STTextBox
             if (c.Scroll.MaxXValue < 0) c.Scroll.MaxXValue = 0;
         }
 
-        private int[] GetOrCreateLineWidthCache(int lineIndex, string text) {
-            if (m_dic_line_widths.TryGetValue(lineIndex, out int[] cached)) {
+        private float[] GetOrCreateLineWidthCache(int lineIndex, string text) {
+            if (m_dic_line_widths.TryGetValue(lineIndex, out float[] cached)) {
                 return cached;
             }
-            int[] widths = new int[text.Length + 1];
-            int currentWidth = 0;
+            float[] widths = new float[text.Length + 1];
+            float currentWidth = 0f;
             var c = base.Core;
             c.ITextBoxRender.BeginPaint();
             try {
+                float monoAdvance = c.ITextBoxRender.CharWidthFloat;
+                bool isMono = c.ITextBoxRender.IsMonospaced && monoAdvance > 0f;
+
                 for (int i = 0; i < text.Length; i++) {
                     char ch = text[i];
-                    int w;
+                    float w;
                     if (ch == '\t') {
-                        w = c.ITextBoxRender.GetTabWidth(currentWidth);
+                        w = c.GetStringWidthFloat("\t", TextStyle.Empty, currentWidth);
                     } else if (ch == '\r' || ch == '\n') {
-                        w = 0;
+                        w = 0f;
+                    } else if (isMono && ch >= 32 && ch <= 126) {
+                        w = monoAdvance;
                     } else {
                         if (!m_dic_char_widths.TryGetValue(ch, out w)) {
-                            w = c.GetStringWidth(ch.ToString(), TextStyle.Empty, currentWidth);
+                            w = c.GetStringWidthFloat(ch.ToString(), TextStyle.Empty, currentWidth);
                             m_dic_char_widths[ch] = w;
                         }
                     }
@@ -287,8 +304,9 @@ namespace ST.Library.UI.STTextBox
             } finally {
                 c.ITextBoxRender.EndPaint();
             }
-            if (currentWidth > m_nMaxLineWidth) {
-                m_nMaxLineWidth = currentWidth;
+            int intTotalWidth = (int)Math.Ceiling(currentWidth);
+            if (intTotalWidth > m_nMaxLineWidth) {
+                m_nMaxLineWidth = intTotalWidth;
             }
             m_dic_line_widths[lineIndex] = widths;
             return widths;

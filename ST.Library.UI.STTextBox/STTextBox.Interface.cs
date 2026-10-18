@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -15,6 +15,8 @@ namespace ST.Library.UI.STTextBox
 
             public int FontHeight { get { return this.ITextBoxRender.GetFontHeight(); } }
             public int LineHeight { get { return this.ITextBoxRender.GetFontHeight() + this.TextBox.GetIntYSize(this.TextBox.LineSpacing); } }
+            public bool IsMonospaced { get { return this.ITextBoxRender.IsMonospaced; } }
+            public float CharWidthFloat { get { return this.ITextBoxRender.CharWidthFloat; } }
             public ITextBoundary IGraphemeSplitter { get; internal set; }
             public ITextBoundary IWordSplitter { get; internal set; }
             public ISTTextBoxRender ITextBoxRender { get; internal set; }
@@ -94,6 +96,10 @@ namespace ST.Library.UI.STTextBox
                 old.UnbindControl();
                 render.BindControl(this.TextBox);
                 this.ITextBoxRender = render;
+                if (this.ITextView != null) {
+                    this.ITextView.Init(this);
+                }
+                this.TextBox.Invalidate();
                 return old;
             }
 
@@ -126,6 +132,16 @@ namespace ST.Library.UI.STTextBox
                     strText = strText.Substring(0, strText.Length - 1);
                 }
                 return this.ITextBoxRender.GetStringWidth(strText, textStyle, nLeftWidth) + this.TextBox.GetIntXSize(this.TextBox.CharSpacing);
+            }
+
+            public float GetStringWidthFloat(string strText, TextStyle textStyle, float fLeftWidth) {
+                if (this.IsEmoji(strText)) {
+                    return (float)this.FontHeight;
+                }
+                if (strText.Length > 1 && strText[strText.Length - 1] >= '\uFE00' && strText[strText.Length - 1] <= '\uFE0F') {
+                    strText = strText.Substring(0, strText.Length - 1);
+                }
+                return this.ITextBoxRender.GetStringWidthFloat(strText, textStyle, fLeftWidth) + (float)this.TextBox.GetIntXSize(this.TextBox.CharSpacing);
             }
 
             public TextStyle GetStyleFromCharIndex(int nIndex) {
