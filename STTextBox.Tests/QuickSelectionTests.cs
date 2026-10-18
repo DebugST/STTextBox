@@ -1000,5 +1000,104 @@ namespace STTextBox.Tests
                 }
             }
         }
+
+        [Fact]
+        public void WrapTextView_ResizedSmaller_InspectSelection()
+        {
+            using (var tbx = new ST.Library.UI.STTextBox.STTextBox())
+            {
+                var wrapView = new WrapTextView();
+                wrapView.ShowLineNumber = true;
+                wrapView.SetWrap(WrapTextView.Method.Word, WrapTextView.Alignment.Left);
+                tbx.SetTextView(wrapView);
+                tbx.SetTextStyleMonitors(new CSharpStyleMonitor());
+                tbx.Font = new Font("Consolas", 10f);
+
+                string strCode = @"//this is code
+var textView = new WrapTextView();      //default: word, left
+textView.ShowLineNumber = true;         //default: true
+textView.SetWrap(WrapTextView.Method.Word, WrapTextView.Alignment.Left);
+textView.ShowLineNumberGuide = true;    //default: true
+textView.LineNumberGuideColor = Color.Magenta;  //default: Magenta
+
+STTextBox tbx = new STTextBox();
+tbx.SetTextView(textView);
+tbx.SetTextStyleMonitors(new CSharpStyleMonitor());
+tbx.Dock = DockStyle.Fill;
+tbx.Font = new System.Drawing.Font(""Consolas"", 10);
+this.Controls.Add(tbx);";
+
+                tbx.SetBounds(0, 0, 600, 400);
+                tbx.SetText(strCode);
+
+                // Resize smaller so lines wrap (width = 320)
+                tbx.SetBounds(0, 0, 320, 400);
+
+                var core = typeof(ST.Library.UI.STTextBox.STTextBox).GetField("m_core", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(tbx) as ST.Library.UI.STTextBox.STTextBox.Core;
+
+                // Test clicking on line 1 subline 1 (which is screen line 2: ": word, left")
+                // Screen line 0: line 0 ("//this is code")
+                // Screen line 1: line 1 subline 0 ("var textView = new WrapTextView();      //default")
+                // Screen line 2: line 1 subline 1 (": word, left")
+                // Screen line 3: line 2 subline 0 ("textView.ShowLineNumber = true;         //default")
+                // Screen line 4: line 2 subline 1 (": true")
+
+                // Let's test FindFromPoint at Screen line 1 and Screen line 2
+                int x = wrapView.TextRectangle.X + 20;
+                int yScreen0 = wrapView.TextRectangle.Y + (int)(core.LineHeight * 0.5);
+                int yScreen1 = wrapView.TextRectangle.Y + (int)(core.LineHeight * 1.5);
+                int yScreen2 = wrapView.TextRectangle.Y + (int)(core.LineHeight * 2.5);
+                int yScreen3 = wrapView.TextRectangle.Y + (int)(core.LineHeight * 3.5);
+                int yScreen4 = wrapView.TextRectangle.Y + (int)(core.LineHeight * 4.5);
+
+                var fi0 = wrapView.FindFromPoint(new Point(x, yScreen0));
+                var fi1 = wrapView.FindFromPoint(new Point(x, yScreen1));
+                var fi2 = wrapView.FindFromPoint(new Point(x, yScreen2));
+                var fi3 = wrapView.FindFromPoint(new Point(x, yScreen3));
+                var fi4 = wrapView.FindFromPoint(new Point(x, yScreen4));
+
+                // Check line indices and char indices
+                Assert.Equal(0, fi0.IndexOfLine);
+                Assert.Equal(1, fi1.IndexOfLine);
+                Assert.Equal(1, fi2.IndexOfLine);
+                Assert.Equal(2, fi3.IndexOfLine);
+                Assert.Equal(2, fi4.IndexOfLine);
+
+                // Now simulate MouseDown at fi1 and MouseMove to fi4
+                var onMouseDown = typeof(ST.Library.UI.STTextBox.STTextBox).GetMethod("OnMouseDown", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                var onMouseMove = typeof(ST.Library.UI.STTextBox.STTextBox).GetMethod("OnMouseMove", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+                onMouseDown.Invoke(tbx, new object[] { new MouseEventArgs(MouseButtons.Left, 1, x, yScreen1, 0) });
+                Assert.Equal(fi1.IndexOfChar, core.Selection.StartIndex);
+                Assert.Equal(fi1.IndexOfChar, core.Selection.EndIndex);
+
+                onMouseMove.Invoke(tbx, new object[] { new MouseEventArgs(MouseButtons.Left, 1, x, yScreen4, 0) });
+                Assert.Equal(fi1.IndexOfChar, core.Selection.StartIndex);
+                Assert.Equal(fi4.IndexOfChar, core.Selection.EndIndex);
+
+                // Now draw to bitmap and inspect pixels to see if selection is actually painted!
+                using (var bmp = new Bitmap(tbx.Width, tbx.Height))
+                {
+                    tbx.DrawToBitmap(bmp, new Rectangle(0, 0, tbx.Width, tbx.Height));
+
+                    // Check if selection color (0, 120, 215) is present on screen lines 1, 2, 3, 4
+                    bool hasBlueScreen1 = false, hasBlueScreen2 = false, hasBlueScreen3 = false, hasBlueScreen4 = false;
+                    for (int px = wrapView.TextRectangle.Left; px < wrapView.TextRectangle.Right; px++)
+                    {
+                        if (bmp.GetPixel(px, yScreen1) == Color.FromArgb(0, 120, 215)) hasBlueScreen1 = true;
+                        if (bmp.GetPixel(px, yScreen2) == Color.FromArgb(0, 120, 215)) hasBlueScreen2 = true;
+                        if (bmp.GetPixel(px, yScreen3) == Color.FromArgb(0, 120, 215)) hasBlueScreen3 = true;
+                        if (bmp.GetPixel(px, yScreen4) == Color.FromArgb(0, 120, 215)) hasBlueScreen4 = true;
+                    }
+
+                    Assert.True(hasBlueScreen1, "Screen line 1 (line 1 sub 0) missing selection background!");
+                    Assert.True(hasBlueScreen2, "Screen line 2 (line 1 sub 1) missing selection background!");
+                    Assert.True(hasBlueScreen3, "Screen line 3 (line 2 sub 0) missing selection background!");
+                    Assert.True(hasBlueScreen4, "Screen line 4 (line 2 sub 1) missing selection background!");
+                }
+            }
+        }
+
     }
 }
+

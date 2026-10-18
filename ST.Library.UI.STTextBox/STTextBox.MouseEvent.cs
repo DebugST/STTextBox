@@ -60,15 +60,14 @@ namespace ST.Library.UI.STTextBox
 
         private Rectangle m_last_sel_region = Rectangle.Empty;
 
-        public void InvalidateSelectionChange(int oldLine, int newLine) {
+        public void InvalidateSelectionPixelYChange(int oldY, int newY) {
             var c = m_core;
-            int minLine = Math.Min(oldLine, newLine);
-            int maxLine = Math.Max(oldLine, newLine);
+            int minY = Math.Min(oldY, newY);
+            int maxY = Math.Max(oldY, newY);
             int lineHeight = c.LineHeight;
-            Point ptTop = c.ITextView.ViewToControl(new Point(0, minLine * lineHeight));
-            int startY = ptTop.Y - 2;
             int spacing = c.TextBox.GetIntYSize(c.TextBox.LineSpacing);
-            int height = ((maxLine - minLine + 1) * lineHeight) + spacing + 4;
+            int startY = minY - 2;
+            int height = (maxY - minY) + lineHeight + spacing + 4;
             startY = Math.Max(c.ViewRectangle.Top, startY);
             height = Math.Min(height, c.ViewRectangle.Bottom - startY);
             if (height <= 0) {
@@ -76,7 +75,47 @@ namespace ST.Library.UI.STTextBox
                 return;
             }
             Rectangle rect = new Rectangle(c.ViewRectangle.Left, startY, c.ViewRectangle.Width, height);
-            if (!m_last_sel_region.IsEmpty && Math.Abs(m_last_sel_region.Y - rect.Y) <= lineHeight * 3) {
+            if (!m_last_sel_region.IsEmpty) {
+                rect = Rectangle.Union(m_last_sel_region, rect);
+            }
+            m_last_sel_region = rect;
+            this.Invalidate(rect);
+        }
+
+        public void InvalidateSelectionChange(int oldLine, int newLine) {
+            var c = m_core;
+            if (c.ITextView is WrapTextView) {
+                var m = c.TextManager;
+                int screenStart = c.ViewRectangle.Top;
+                int screenEnd = c.ViewRectangle.Bottom;
+                int minLine = Math.Min(oldLine, newLine);
+                int maxLine = Math.Max(oldLine, newLine);
+                if (minLine >= 0 && minLine < m.LineCount) {
+                    var fi = c.ITextView.FindFromCharIndex(m[minLine].IndexOfFirstChar);
+                    if (fi.Find) screenStart = fi.Location.Y;
+                }
+                if (maxLine >= 0 && maxLine < m.LineCount) {
+                    var fi = c.ITextView.FindFromCharIndex(m[maxLine].IndexOfFirstChar + m[maxLine].RawString.Length);
+                    if (fi.Find) screenEnd = fi.Location.Y + c.LineHeight;
+                }
+                InvalidateSelectionPixelYChange(screenStart, screenEnd);
+                return;
+            }
+            int minL = Math.Min(oldLine, newLine);
+            int maxL = Math.Max(oldLine, newLine);
+            int lineHeight = c.LineHeight;
+            Point ptTop = c.ITextView.ViewToControl(new Point(0, minL * lineHeight));
+            int startY = ptTop.Y - 2;
+            int spacing = c.TextBox.GetIntYSize(c.TextBox.LineSpacing);
+            int height = ((maxL - minL + 1) * lineHeight) + spacing + 4;
+            startY = Math.Max(c.ViewRectangle.Top, startY);
+            height = Math.Min(height, c.ViewRectangle.Bottom - startY);
+            if (height <= 0) {
+                this.Invalidate();
+                return;
+            }
+            Rectangle rect = new Rectangle(c.ViewRectangle.Left, startY, c.ViewRectangle.Width, height);
+            if (!m_last_sel_region.IsEmpty) {
                 rect = Rectangle.Union(m_last_sel_region, rect);
             }
             m_last_sel_region = rect;
@@ -97,7 +136,7 @@ namespace ST.Library.UI.STTextBox
                     return;
             }
             if (e.Button == System.Windows.Forms.MouseButtons.Left) {
-                int oldLine = c.Caret.IndexOfLine;
+                int oldCaretY = c.Caret.Y;
                 var fi = c.ITextView.SetCaretPostion(e.Location);
                 if (!fi.Find) return;
                 int nIndex = c.Caret.IndexOfChar;
@@ -107,7 +146,7 @@ namespace ST.Library.UI.STTextBox
                     m_last_sel_region = Rectangle.Empty;
                     this.Invalidate();
                 } else {
-                    this.InvalidateSelectionChange(oldLine, c.Caret.IndexOfLine);
+                    this.InvalidateSelectionPixelYChange(oldCaretY, c.Caret.Y);
                 }
                 return;
             }

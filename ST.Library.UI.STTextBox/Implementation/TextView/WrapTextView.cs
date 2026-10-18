@@ -881,11 +881,30 @@ namespace ST.Library.UI.STTextBox
                 int nLeft = base.TextRectangle.X + subLine.X + startX;
                 int nWidth = endX - startX;
                 if (nWidth > 0) {
-                    render.FillRectangle(c.TextBox.SelectionColor, nLeft, nY, nWidth, c.LineHeight);
+                    Color selColor = c.TextBox.SelectionColor.A == 0 ? Color.FromArgb(0, 120, 215) : c.TextBox.SelectionColor;
+                    render.FillRectangle(selColor, nLeft, nY, nWidth, c.LineHeight + 1);
                 }
                 nY += c.LineHeight;
                 if (nY >= base.TextRectangle.Bottom) break;
             }
+        }
+
+        public override bool ScrollToCaret() {
+            var c = this.Core;
+            bool flag = false;
+            Point pt = c.Caret.Location;
+            if (pt.Y < this.TextRectangle.Y) {
+                c.Scroll.YValue += (pt.Y - this.TextRectangle.Y) / c.LineHeight;
+                flag = true;
+            } else if (pt.Y + c.LineHeight > this.TextRectangle.Bottom) {
+                int nIncrement = (int)Math.Ceiling((pt.Y + c.LineHeight - this.TextRectangle.Bottom) / (float)c.LineHeight);
+                c.Scroll.YValue += nIncrement;
+                flag = true;
+            }
+            if (flag) {
+                this.SetCaretPostion(c.Caret.IndexOfChar);
+            }
+            return flag;
         }
 
         public override void OnResize(EventArgs e) {
