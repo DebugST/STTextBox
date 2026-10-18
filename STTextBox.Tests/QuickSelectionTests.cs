@@ -825,5 +825,62 @@ namespace STTextBox.Tests
                 Assert.True(gdipTypingMs < 250, $"GDIP Typing too slow: {gdipTypingMs}ms for 100 chars");
             }
         }
+
+        [Fact]
+        public void WrapTextView_Selection_NoGhostOffsets_GDI_GDIP()
+        {
+            using (var tbx = new ST.Library.UI.STTextBox.STTextBox())
+            using (var gdipRender = new STTextBoxGDIPRender())
+            using (var gdiRender = new STTextBoxGDIRender()) {
+                tbx.SetBounds(0, 0, 1170, 700);
+                tbx.Font = new Font("Segoe UI", 10.5f);
+
+                string line52_content = "52. 也多霜法起后栻玉开所wn4^ 薇列晏玄可下列子我列张fvvvj2 作为fd&zh 分昌玄不出生下5ni&q 周为都这霰性而出冬暑一能bmae^ 闺浑\\% \r\n";
+                string line53_content = "53. ntcd zgdn 称数物当狄实御lib i6d2 法号分们他出成b*o7r2 进为雨也业绩诸使其邑展hkuu uý cw edpoend 夸爱方\r\n";
+                string line54_content = "54. 说我到高水地若如a3im 二出过雨用民pf^npa ph^*9 性昃岁大水h 8f7 nq0m o0m* $6 i0u 它们而产%(&zkod 余足k1\r\n";
+
+                // Test across both renderers: GDIP and GDI
+                foreach (ISTTextBoxRender render in new ISTTextBoxRender[] { gdipRender, gdiRender }) {
+                    tbx.SetTextBoxRender(render);
+                    var wrapView = new WrapTextView(WrapTextView.Method.Word, WrapTextView.Alignment.Center);
+                    wrapView.ShowLineNumber = true;
+                    tbx.SetTextView(wrapView);
+                    tbx.SetText(line52_content + line53_content + line54_content);
+
+                    var core = typeof(ST.Library.UI.STTextBox.STTextBox).GetField("m_core", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(tbx) as ST.Library.UI.STTextBox.STTextBox.Core;
+                    var line0 = core.TextManager[0];
+
+                    var getTag = typeof(WrapTextView).GetMethod("_Tag", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    var tag = getTag.Invoke(wrapView, new object[] { line0 });
+                    var subLinesField = tag.GetType().GetProperty("SubLines").GetValue(tag) as System.Collections.IList;
+
+                    var sub = subLinesField[0];
+                    int sLen = (int)sub.GetType().GetField("Length").GetValue(sub);
+                    int sWidth = (int)sub.GetType().GetField("Width").GetValue(sub);
+                    int sX = (int)sub.GetType().GetField("X").GetValue(sub);
+                    int[] offsets = (int[])sub.GetType().GetField("Offsets").GetValue(sub);
+
+                    string drawStr = line52_content.TrimEnd('\r', '\n');
+                    var style = new TextStyle();
+                    float actualStrWidthFloat = render.GetStringWidthFloat(drawStr, style, 0);
+                    int actualStrWidthInt = (int)Math.Ceiling(actualStrWidthFloat);
+
+                    // Offsets at line end must equal visual text width (0 ghost offset)
+                    Assert.True(Math.Abs(offsets[sLen] - actualStrWidthInt) <= 1, $"Offset drift in {render.GetType().Name}: {offsets[sLen]} vs {actualStrWidthInt}");
+
+                    // Selection end must align exactly with text visual end
+                    core.Selection.SetSelection(4, line52_content.Length + line53_content.Length + 50);
+                    int relStart = 4;
+                    int relEnd = sLen;
+                    int startX = offsets[relStart];
+                    int endX = offsets[relEnd];
+                    int nLeft = wrapView.TextRectangle.X + sX + startX;
+                    int nWidth = endX - startX;
+
+                    int visualRight = wrapView.TextRectangle.X + sX + actualStrWidthInt;
+                    Assert.True(Math.Abs((nLeft + nWidth) - visualRight) <= 1, $"Selection block mismatch in {render.GetType().Name}: {nLeft + nWidth} vs {visualRight}");
+                }
+            }
+        }
     }
 }

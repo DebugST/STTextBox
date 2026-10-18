@@ -32,10 +32,10 @@ namespace ST.Library.UI.STTextBox
 
         private class WordInfo
         {
-            public int Width;
+            public float Width;
             public int CharCount;
             public int[] GraphemeLengths;
-            public int[] GraphemeWidths;
+            public float[] GraphemeWidths;
         }
 
         private class SubLineInfo
@@ -53,7 +53,7 @@ namespace ST.Library.UI.STTextBox
 
         private int m_n_line_count_start_change = 0;
         private HashSet<TextLine> m_hs_changed_temp = new HashSet<TextLine>();
-        private readonly Dictionary<char, int> m_dic_char_widths = new Dictionary<char, int>();
+        private readonly Dictionary<char, float> m_dic_char_widths = new Dictionary<char, float>();
 
         private readonly StringFormat m_sf = new StringFormat(StringFormat.GenericTypographic) {
             Alignment = StringAlignment.Far,
@@ -154,22 +154,25 @@ namespace ST.Library.UI.STTextBox
             m_hs_changed_temp.Add(e.Line);
         }
 
-        private int GetCharWidthFast(STTextBox.Core c, TextLine line, int charIndexInLine, string strChar, int curX) {
+        private float GetCharWidthFastFloat(STTextBox.Core c, TextLine line, int charIndexInLine, string strChar, float curX) {
+            if (string.IsNullOrEmpty(strChar)) return 0f;
             if (strChar.Length == 1) {
                 char ch = strChar[0];
+                if (ch == '\r' || ch == '\n') return 0f;
                 if (ch < 128 && c.ITextBoxRender.IsMonospaced) {
-                    return c.ITextBoxRender.GetSpaceWidth();
+                    return c.ITextBoxRender.CharWidthFloat > 0f ? c.ITextBoxRender.CharWidthFloat : (float)c.ITextBoxRender.GetSpaceWidth();
                 }
-                if (m_dic_char_widths.TryGetValue(ch, out int cachedW)) {
+                if (m_dic_char_widths.TryGetValue(ch, out float cachedW)) {
                     return cachedW;
                 }
                 var style = c.GetStyleFromCharIndex(line.IndexOfFirstChar + charIndexInLine);
-                int w = c.GetStringWidth(strChar, style, curX);
+                float w = c.GetStringWidthFloat(strChar, style, curX);
                 m_dic_char_widths[ch] = w;
                 return w;
             } else {
+                if (strChar == "\r\n") return 0f;
                 var style = c.GetStyleFromCharIndex(line.IndexOfFirstChar + charIndexInLine);
-                return c.GetStringWidth(strChar, style, curX);
+                return c.GetStringWidthFloat(strChar, style, curX);
             }
         }
 
@@ -178,7 +181,7 @@ namespace ST.Library.UI.STTextBox
             List<SubLineInfo> lst = null;
             if (this.WrapMethod == Method.Char) {
                 lst = new List<SubLineInfo>();
-                this.GetCacheByChar(line, render, lst, 0, 0);
+                this.GetCacheByChar(line, render, lst, 0);
             } else {
                 lst = this.GetCacheByWord(line, render);
             }
@@ -187,46 +190,9 @@ namespace ST.Library.UI.STTextBox
                 switch (this.WrapAlignment) {
                     case Alignment.Center:
                         sub.X = (base.TextRectangle.Width - sub.Width) >> 1;
-                        if (sub.Length > 0) {
-                            switch (line.RawString[sub.Index + sub.Length - 1]) {
-                                case '\r':
-                                case '\n':
-                                    sub.X += c.ITextBoxRender.GetSpaceWidth() / 2;
-                                    break;
-                            }
-                        }
                         break;
                     case Alignment.Right:
                         sub.X = base.TextRectangle.Width - sub.Width - c.ITextBoxRender.GetSpaceWidth();
-                        if (sub.Length > 0) {
-                            switch (line.RawString[sub.Index]) {
-                                case '\r':
-                                case '\n':
-                                    if (i == 0) break;
-                                    var temp = lst[i - 1];
-                                    temp.Width += sub.Width;
-                                    temp.Length += sub.Length;
-                                    temp.CharCount += 1;
-                                    if (temp.Offsets != null && sub.Offsets != null) {
-                                        int[] mergedOffsets = new int[temp.Length + 1];
-                                        Array.Copy(temp.Offsets, 0, mergedOffsets, 0, temp.Offsets.Length);
-                                        for (int k = temp.Offsets.Length; k < mergedOffsets.Length; k++) {
-                                            mergedOffsets[k] = temp.Width;
-                                        }
-                                        temp.Offsets = mergedOffsets;
-                                    }
-                                    lst[i - 1] = temp;
-                                    lst.RemoveAt(i);
-                                    return lst;
-                            }
-                            switch (line.RawString[sub.Index + sub.Length - 1]) {
-                                case '\r':
-                                case '\n':
-                                    sub.X += c.ITextBoxRender.GetSpaceWidth();
-                                    break;
-                            }
-                            break;
-                        }
                         break;
                 }
                 lst[i] = sub;
@@ -234,32 +200,35 @@ namespace ST.Library.UI.STTextBox
             return lst;
         }
 
-        private int GetCacheByChar(TextLine line, ISTTextBoxRender render, List<SubLineInfo> lst, int nStartIndex, int nWidth) {
+        private void GetCacheByChar(TextLine line, ISTTextBoxRender render, List<SubLineInfo> lst, int nStartIndex) {
             var c = base.Core;
-            int nLineWidth = nWidth, nCharWidth = 0;
+            float nTextViewLineWidth = (float)Math.Max(10, base.TextRectangle.Width);
+            if (this.WrapAlignment != Alignment.Left) {
+                nTextViewLineWidth -= (float)c.ITextBoxRender.GetSpaceWidth();
+            }
+            nTextViewLineWidth = Math.Max(1f, nTextViewLineWidth);
+
+            float nLineWidth = 0f;
             int nSubStrLen = 0;
             int nCharCount = 0;
-            int nTextViewLineWidth = Math.Max(10, base.TextRectangle.Width);
-            if (this.WrapAlignment != Alignment.Left) {
-                nTextViewLineWidth -= c.ITextBoxRender.GetSpaceWidth();
-            }
-            nTextViewLineWidth = Math.Max(1, nTextViewLineWidth);
-
             List<int> curOffsets = new List<int>() { 0 };
 
             c.IGraphemeSplitter.Each(line.RawString, nStartIndex, (str, nStart, nLen) => {
                 string strChar = str.Substring(nStart, nLen);
-                if (c.IsEmoji(strChar)) {
-                    nCharWidth = c.FontHeight;
+                float nCharWidth;
+                if (strChar == "\r\n" || strChar == "\r" || strChar == "\n") {
+                    nCharWidth = 0f;
+                } else if (c.IsEmoji(strChar)) {
+                    nCharWidth = (float)c.FontHeight;
                 } else {
-                    nCharWidth = GetCharWidthFast(c, line, nStart, strChar, nLineWidth);
+                    nCharWidth = GetCharWidthFastFloat(c, line, nStart, strChar, nLineWidth);
                 }
                 if (nLineWidth + nCharWidth >= nTextViewLineWidth && nSubStrLen > 0) {
                     lst.Add(new SubLineInfo() {
                         Index = nStartIndex,
                         Length = nSubStrLen,
                         CharCount = nCharCount,
-                        Width = nLineWidth,
+                        Width = (int)Math.Round(nLineWidth),
                         Offsets = curOffsets.ToArray()
                     });
                     curOffsets.Clear();
@@ -268,15 +237,17 @@ namespace ST.Library.UI.STTextBox
                     nStartIndex += nSubStrLen;
                     nSubStrLen = nLen;
                     nLineWidth = nCharWidth;
+                    int off = (int)Math.Round(nLineWidth);
                     for (int k = 1; k <= nLen; k++) {
-                        curOffsets.Add(nLineWidth);
+                        curOffsets.Add(off);
                     }
                 } else {
                     nSubStrLen += nLen;
                     nLineWidth += nCharWidth;
                     nCharCount++;
+                    int off = (int)Math.Round(nLineWidth);
                     for (int k = 1; k <= nLen; k++) {
-                        curOffsets.Add(nLineWidth);
+                        curOffsets.Add(off);
                     }
                 }
                 return true;
@@ -285,24 +256,23 @@ namespace ST.Library.UI.STTextBox
                 Index = nStartIndex,
                 Length = nSubStrLen,
                 CharCount = nCharCount,
-                Width = nLineWidth,
+                Width = (int)Math.Round(nLineWidth),
                 Offsets = curOffsets.ToArray()
             });
-            return nLineWidth;
         }
 
         private List<SubLineInfo> GetCacheByWord(TextLine line, ISTTextBoxRender render) {
             var c = base.Core;
-            int nTextViewLineWidth = Math.Max(10, base.TextRectangle.Width);
+            float nTextViewLineWidth = (float)Math.Max(10, base.TextRectangle.Width);
             if (this.WrapAlignment != Alignment.Left) {
-                nTextViewLineWidth -= c.ITextBoxRender.GetSpaceWidth();
+                nTextViewLineWidth -= (float)c.ITextBoxRender.GetSpaceWidth();
             }
-            nTextViewLineWidth = Math.Max(1, nTextViewLineWidth);
+            nTextViewLineWidth = Math.Max(1f, nTextViewLineWidth);
 
             List<SubLineInfo> lst = new List<SubLineInfo>();
             int curSubStart = 0;
             int curSubLen = 0;
-            int curSubWidth = 0;
+            float curSubWidth = 0f;
             int curCharCount = 0;
             List<int> curOffsets = new List<int>() { 0 };
 
@@ -314,18 +284,18 @@ namespace ST.Library.UI.STTextBox
                     // Single word is wider than the entire line -> split character by character
                     for (int g = 0; g < wi.GraphemeLengths.Length; g++) {
                         int gLen = wi.GraphemeLengths[g];
-                        int gWidth = wi.GraphemeWidths[g];
+                        float gWidth = wi.GraphemeWidths[g];
                         if (curSubWidth + gWidth >= nTextViewLineWidth && curSubLen > 0) {
                             lst.Add(new SubLineInfo() {
                                 Index = curSubStart,
                                 Length = curSubLen,
                                 CharCount = curCharCount,
-                                Width = curSubWidth,
+                                Width = (int)Math.Round(curSubWidth),
                                 Offsets = curOffsets.ToArray()
                             });
                             curSubStart += curSubLen;
                             curSubLen = 0;
-                            curSubWidth = 0;
+                            curSubWidth = 0f;
                             curCharCount = 0;
                             curOffsets.Clear();
                             curOffsets.Add(0);
@@ -333,8 +303,9 @@ namespace ST.Library.UI.STTextBox
                         curSubLen += gLen;
                         curSubWidth += gWidth;
                         curCharCount++;
+                        int off = (int)Math.Round(curSubWidth);
                         for (int k = 1; k <= gLen; k++) {
-                            curOffsets.Add(curSubWidth);
+                            curOffsets.Add(off);
                         }
                     }
                     return true;
@@ -346,12 +317,12 @@ namespace ST.Library.UI.STTextBox
                         Index = curSubStart,
                         Length = curSubLen,
                         CharCount = curCharCount,
-                        Width = curSubWidth,
+                        Width = (int)Math.Round(curSubWidth),
                         Offsets = curOffsets.ToArray()
                     });
                     curSubStart += curSubLen;
                     curSubLen = 0;
-                    curSubWidth = 0;
+                    curSubWidth = 0f;
                     curCharCount = 0;
                     curOffsets.Clear();
                     curOffsets.Add(0);
@@ -360,12 +331,13 @@ namespace ST.Library.UI.STTextBox
                 // Add the word to the current subline
                 for (int g = 0; g < wi.GraphemeLengths.Length; g++) {
                     int gLen = wi.GraphemeLengths[g];
-                    int gWidth = wi.GraphemeWidths[g];
+                    float gWidth = wi.GraphemeWidths[g];
                     curSubLen += gLen;
                     curSubWidth += gWidth;
                     curCharCount++;
+                    int off = (int)Math.Round(curSubWidth);
                     for (int k = 1; k <= gLen; k++) {
-                        curOffsets.Add(curSubWidth);
+                        curOffsets.Add(off);
                     }
                 }
                 return true;
@@ -375,27 +347,37 @@ namespace ST.Library.UI.STTextBox
                 Index = curSubStart,
                 Length = curSubLen,
                 CharCount = curCharCount,
-                Width = curSubWidth,
+                Width = (int)Math.Round(curSubWidth),
                 Offsets = curOffsets.ToArray()
             });
 
             return lst;
         }
 
-        private WordInfo GetWordInfo(TextLine line, ISTTextBoxRender render, string strWord, int nIndex, int nLeftWidth) {
+        private WordInfo GetWordInfo(TextLine line, ISTTextBoxRender render, string strWord, int nIndex, float nLeftWidth) {
             var c = base.Core;
-            int nWordWidth = 0;
+            if (strWord == "\r\n" || strWord == "\r" || strWord == "\n") {
+                return new WordInfo() {
+                    Width = 0f,
+                    CharCount = 1,
+                    GraphemeLengths = new int[] { strWord.Length },
+                    GraphemeWidths = new float[] { 0f }
+                };
+            }
+            float nWordWidth = 0f;
             int nCharCount = 0;
             List<int> gLens = new List<int>();
-            List<int> gWidths = new List<int>();
+            List<float> gWidths = new List<float>();
 
             c.IGraphemeSplitter.Each(strWord, (s, ns, nl) => {
                 string strChar = s.Substring(ns, nl);
-                int nCharWidth;
-                if (c.IsEmoji(strChar)) {
-                    nCharWidth = c.FontHeight;
+                float nCharWidth;
+                if (strChar == "\r\n" || strChar == "\r" || strChar == "\n") {
+                    nCharWidth = 0f;
+                } else if (c.IsEmoji(strChar)) {
+                    nCharWidth = (float)c.FontHeight;
                 } else {
-                    nCharWidth = GetCharWidthFast(c, line, nIndex + ns, strChar, nLeftWidth + nWordWidth);
+                    nCharWidth = GetCharWidthFastFloat(c, line, nIndex + ns, strChar, nLeftWidth + nWordWidth);
                 }
                 gLens.Add(nl);
                 gWidths.Add(nCharWidth);
