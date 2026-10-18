@@ -213,27 +213,29 @@ namespace ST.Library.UI.STTextBox
                 return c.LineHeight;
             }
 
-            // Partially selected line: 3 fast chunks
-            // 1. Unselected prefix
-            if (selStartCol > 0) {
-                string prefix = raw.Substring(0, selStartCol);
-                DrawTextChunk(render, prefix, baseX, nY, widths[selStartCol], false);
-            }
+            // Partially selected line:
+            // Use dual-pass clip rendering to eliminate GDI+ subpixel character rearrangement / glyph jitter.
+            // Both passes draw from the exact identical line origin (baseX), ensuring ClearType grid-fitting
+            // never shifts glyphs horizontally when text transitions between unselected and selected states.
+            string fullText = raw.Substring(0, drawLength);
+            DrawTextChunk(render, fullText, baseX, nY, widths[drawLength], false);
 
-            // 2. Selected middle chunk
             if (selEndCol > selStartCol) {
-                string selectedText = raw.Substring(selStartCol, selEndCol - selStartCol);
-                float selX = baseX + widths[selStartCol];
-                float selW = widths[selEndCol] - widths[selStartCol];
-                DrawTextChunk(render, selectedText, selX, nY, selW, true);
-            }
-
-            // 3. Unselected suffix
-            if (selEndCol < drawLength) {
-                string suffix = raw.Substring(selEndCol, drawLength - selEndCol);
-                float suffX = baseX + widths[selEndCol];
-                float suffW = widths[drawLength] - widths[selEndCol];
-                DrawTextChunk(render, suffix, suffX, nY, suffW, false);
+                Color selTextColor = (c.TextBox.SelectedTextColor != Color.Empty) ? c.TextBox.SelectedTextColor : Color.White;
+                if (selTextColor != c.TextBox.ForeColor) {
+                    int selStartX = base.TextRectangle.Left - c.Scroll.XOffset + (int)Math.Round(widths[selStartCol]);
+                    int selEndX = base.TextRectangle.Left - c.Scroll.XOffset + (int)Math.Round(widths[selEndCol]);
+                    int selWidth = selEndX - selStartX;
+                    if (selWidth > 0) {
+                        Rectangle selClip = new Rectangle(selStartX, nY, selWidth, c.LineHeight + LINE_OVERLAP_MARGIN);
+                        selClip.Intersect(base.TextRectangle);
+                        if (selClip.Width > 0 && selClip.Height > 0) {
+                            render.SetClip(selClip);
+                            DrawTextChunk(render, fullText, baseX, nY, widths[drawLength], true);
+                            render.SetClip(base.TextRectangle);
+                        }
+                    }
+                }
             }
 
             return c.LineHeight;

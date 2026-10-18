@@ -225,5 +225,70 @@ namespace STTextBox.Tests
                 }
             }
         }
+
+        [Fact]
+        public void QuickTextView_DualPassClipRendering_EliminatesGlyphShiftWhenSelected()
+        {
+            using (var tbx = new ST.Library.UI.STTextBox.STTextBox()) {
+                var view = new QuickTextView();
+                tbx.SetTextView(view);
+                tbx.Font = new Font("Consolas", 10.5f);
+                tbx.SetBounds(0, 0, 800, 100);
+
+                string chineseText = "\u4e24\u628a\u81f4\u591a\u53f7\u6211\u4e24\u4e3a\u597d\u6210\u9732\u529b\u7740\u672c\u591c\u6210\u5b9a\u6c11\u65f6\u4e0b\u7384\u5730\u9633";
+                tbx.SetText(chineseText);
+                tbx.SelectionColor = Color.FromArgb(0, 120, 215);
+                tbx.SelectedTextColor = Color.White;
+
+                using (var render = new STTextBoxGDIPRender()) {
+                    tbx.SetTextBoxRender(render);
+
+                    // 1. Render without selection
+                    using (var bmpUnselected = new Bitmap(800, 100))
+                    using (var g1 = Graphics.FromImage(bmpUnselected)) {
+                        g1.Clear(Color.White);
+                        render.OnBeginPaint(g1);
+                        view.OnDrawView(render);
+                        render.OnEndPaint(g1);
+
+                        // 2. Render with partial selection (chars 6 to 15)
+                        tbx.Select(6, 9);
+                        using (var bmpSelected = new Bitmap(800, 100))
+                        using (var g2 = Graphics.FromImage(bmpSelected)) {
+                            g2.Clear(Color.White);
+                            render.OnBeginPaint(g2);
+                            view.OnDrawView(render);
+                            render.OnEndPaint(g2);
+
+                            FindInfo fi6 = view.FindFromCharIndex(6);
+                            FindInfo fi15 = view.FindFromCharIndex(15);
+
+                            // Verify prefix region (before selection): 0 pixel differences
+                            int prefixDiff = 0;
+                            int fontHeight = render.GetFontHeight();
+                            for (int y = view.TextRectangle.Top; y < view.TextRectangle.Top + fontHeight; y++) {
+                                for (int x = view.TextRectangle.Left; x < fi6.Location.X - 1; x++) {
+                                    if (bmpUnselected.GetPixel(x, y).ToArgb() != bmpSelected.GetPixel(x, y).ToArgb()) {
+                                        prefixDiff++;
+                                    }
+                                }
+                            }
+                            Assert.Equal(0, prefixDiff);
+
+                            // Verify suffix region (after selection): 0 pixel differences (zero glyph shift/jiggle)
+                            int suffixDiff = 0;
+                            for (int y = view.TextRectangle.Top; y < view.TextRectangle.Top + fontHeight; y++) {
+                                for (int x = fi15.Location.X + 2; x < 700; x++) {
+                                    if (bmpUnselected.GetPixel(x, y).ToArgb() != bmpSelected.GetPixel(x, y).ToArgb()) {
+                                        suffixDiff++;
+                                    }
+                                }
+                            }
+                            Assert.Equal(0, suffixDiff);
+                        }
+                    }
+                }
+            }
+        }
     }
 }
