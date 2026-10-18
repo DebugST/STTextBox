@@ -1,0 +1,3 @@
+[submodule "External/GraphemeSplitterNET"]
+	path = External/GraphemeSplitterNET
+	url = https://github.com/tpbeldie/GraphemeSplitterNET
