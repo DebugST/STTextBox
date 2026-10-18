@@ -958,5 +958,47 @@ namespace STTextBox.Tests
                 Assert.Equal("hello world".Length, fi.IndexOfCharInLine);
             }
         }
+
+        [Fact]
+        public void NoWrapTextView_StyledText_SelectionDragHasZeroGlyphJitter()
+        {
+            using (var tbx = new ST.Library.UI.STTextBox.STTextBox())
+            using (var gdipRender = new STTextBoxGDIPRender())
+            {
+                tbx.SetBounds(0, 0, 500, 100);
+                tbx.SetTextBoxRender(gdipRender);
+                var noWrapView = new NoWrapTextView();
+                tbx.SetTextView(noWrapView);
+                tbx.SetTextStyleMonitors(new CSharpStyleMonitor());
+                tbx.Font = new Font("Consolas", 10f);
+
+                string line = "tbx_single.AllowScrollBar = false;";
+                tbx.SetText(line);
+
+                // Render unselected line to bitmap1
+                using (var bmpUnselected = new Bitmap(tbx.Width, tbx.Height))
+                using (var bmpSelected = new Bitmap(tbx.Width, tbx.Height))
+                {
+                    tbx.Select(0, 0); // No selection
+                    tbx.DrawToBitmap(bmpUnselected, new Rectangle(0, 0, tbx.Width, tbx.Height));
+
+                    // Now select 'w' (index 15)
+                    tbx.Select(15, 1);
+                    tbx.DrawToBitmap(bmpSelected, new Rectangle(0, 0, tbx.Width, tbx.Height));
+
+                    // Characters BEFORE 'w' (e.g. "tbx_single.Allo", X=0..130) must be 100% IDENTICAL
+                    // and not have shifted by even a single pixel
+                    for (int x = noWrapView.TextRectangle.Left; x < noWrapView.TextRectangle.Left + 100; x++)
+                    {
+                        for (int y = noWrapView.TextRectangle.Y; y < noWrapView.TextRectangle.Bottom; y++)
+                        {
+                            Color p1 = bmpUnselected.GetPixel(x, y);
+                            Color p2 = bmpSelected.GetPixel(x, y);
+                            Assert.True(p1 == p2, $"Glyph pixel jitter detected at ({x},{y}): unselected={p1}, selected={p2}");
+                        }
+                    }
+                }
+            }
+        }
     }
 }

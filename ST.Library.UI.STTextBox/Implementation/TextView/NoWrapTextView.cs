@@ -273,119 +273,113 @@ namespace ST.Library.UI.STTextBox
             int nLineSpacing = c.TextBox.GetIntYSize(c.TextBox.LineSpacing) / 2;
             int nCharSpacing = c.TextBox.GetIntXSize(c.TextBox.CharSpacing);
 
-            // Fast path: if line has no emojis, no tabs, and no style monitors:
-            // Dual-pass clip rendering for silky-smooth, jitter-free selection!
-            bool hasSpecialChars = false;
-            for (int i = 0; i < drawLength; i++) {
-                char ch = raw[i];
-                if (ch == '\t' || ch >= 0xD800) {
-                    hasSpecialChars = true;
-                    break;
-                }
-            }
+            void DrawRuns(bool isSelectionPass) {
+                int runStart = 0;
+                int runStartX = baseX;
+                TextStyle syntaxRunStyle = TextStyle.Empty;
+                bool hasRun = false;
 
-            bool hasStyleMonitors = c.ITextStyleMonitors != null && c.ITextStyleMonitors.Length > 0;
-            if (!hasSpecialChars && !hasStyleMonitors) {
-                // Pass 1: Draw full line unselected
-                string fullText = raw.Substring(0, drawLength);
-                TextStyle style = c.GetStyleFromCharIndex(lineStart);
-                if (style.ForeColor.A == 0) style.ForeColor = c.TextBox.ForeColor;
-                render.DrawString(fullText, style, new Rectangle(baseX, nY, offsets[drawLength], c.LineHeight));
+                for (int i = 0; i < drawLength; i++) {
+                    char ch = raw[i];
+                    int charIdx = lineStart + i;
 
-                // Pass 2: Draw selection clip
-                if (hasSelection && selTextColor != style.ForeColor) {
-                    int selStartCol = Math.Max(0, Math.Min(drawLength, selStart - lineStart));
-                    int selEndCol = Math.Max(0, Math.Min(drawLength, selEnd - lineStart));
-                    if (selEndCol > selStartCol) {
-                        int selStartX = baseX + offsets[selStartCol];
-                        int selEndX = baseX + offsets[selEndCol];
-                        int selWidth = selEndX - selStartX;
-                        if (selWidth > 0) {
-                            Rectangle selClip = new Rectangle(selStartX, nY, selWidth, c.LineHeight + LINE_OVERLAP_MARGIN);
-                            selClip.Intersect(base.TextRectangle);
-                            if (selClip.Width > 0 && selClip.Height > 0) {
-                                render.SetClip(selClip);
-                                TextStyle selStyle = style;
-                                selStyle.ForeColor = selTextColor;
-                                render.DrawString(fullText, selStyle, new Rectangle(baseX, nY, offsets[drawLength], c.LineHeight));
-                                render.SetClip(base.TextRectangle);
-                            }
-                        }
-                    }
-                }
-                return c.LineHeight;
-            }
-
-            // General path for lines with emojis or tabs: batched runs
-            int runStart = 0;
-            int runStartX = baseX;
-            TextStyle runStyle = TextStyle.Empty;
-            bool runIsSelected = false;
-            bool hasRun = false;
-
-            for (int i = 0; i < drawLength; i++) {
-                char ch = raw[i];
-                int charIdx = lineStart + i;
-                bool isSel = hasSelection && (charIdx >= selStart && charIdx < selEnd);
-
-                if (ch == '\t') {
-                    if (hasRun && i > runStart) {
-                        string runStr = raw.Substring(runStart, i - runStart);
-                        int runWidth = offsets[i] - offsets[runStart];
-                        render.DrawString(runStr, runStyle, new Rectangle(runStartX, nY, runWidth, c.LineHeight));
-                        hasRun = false;
-                    }
-                    continue;
-                }
-
-                if (char.IsHighSurrogate(ch) && i + 1 < drawLength && char.IsLowSurrogate(raw[i + 1])) {
-                    string surrogateStr = raw.Substring(i, 2);
-                    if (c.IsEmoji(surrogateStr)) {
+                    if (ch == '\t') {
                         if (hasRun && i > runStart) {
                             string runStr = raw.Substring(runStart, i - runStart);
                             int runWidth = offsets[i] - offsets[runStart];
-                            render.DrawString(runStr, runStyle, new Rectangle(runStartX, nY, runWidth, c.LineHeight));
+                            TextStyle drawStyle = syntaxRunStyle;
+                            if (isSelectionPass) {
+                                drawStyle.ForeColor = selTextColor;
+                                drawStyle.BackColor = Color.Transparent;
+                            }
+                            render.DrawString(runStr, drawStyle, new Rectangle(runStartX, nY, runWidth, c.LineHeight));
                             hasRun = false;
                         }
-                        if (c.IEmojiRender != null) {
-                            c.IEmojiRender.DrawEmoji(render, surrogateStr, baseX + offsets[i] + (nCharSpacing >> 1), nY + nLineSpacing, c.FontHeight, isSel);
-                        }
-                        i++;
                         continue;
                     }
-                }
 
-                var style = c.GetStyleFromCharIndex(charIdx);
-                if (style.ForeColor.A == 0) style.ForeColor = c.TextBox.ForeColor;
-                if (isSel && selTextColor != Color.Empty) {
-                    style.ForeColor = selTextColor;
-                }
-
-                if (!hasRun) {
-                    runStart = i;
-                    runStartX = baseX + offsets[i];
-                    runStyle = style;
-                    runIsSelected = isSel;
-                    hasRun = true;
-                } else if (runIsSelected != isSel || runStyle.ForeColor != style.ForeColor || runStyle.BackColor != style.BackColor || runStyle.FontStyle != style.FontStyle) {
-                    int runLen = i - runStart;
-                    if (runLen > 0) {
-                        string runStr = raw.Substring(runStart, runLen);
-                        int runWidth = offsets[i] - offsets[runStart];
-                        render.DrawString(runStr, runStyle, new Rectangle(runStartX, nY, runWidth, c.LineHeight));
+                    if (char.IsHighSurrogate(ch) && i + 1 < drawLength && char.IsLowSurrogate(raw[i + 1])) {
+                        string surrogateStr = raw.Substring(i, 2);
+                        if (c.IsEmoji(surrogateStr)) {
+                            if (hasRun && i > runStart) {
+                                string runStr = raw.Substring(runStart, i - runStart);
+                                int runWidth = offsets[i] - offsets[runStart];
+                                TextStyle drawStyle = syntaxRunStyle;
+                                if (isSelectionPass) {
+                                    drawStyle.ForeColor = selTextColor;
+                                    drawStyle.BackColor = Color.Transparent;
+                                }
+                                render.DrawString(runStr, drawStyle, new Rectangle(runStartX, nY, runWidth, c.LineHeight));
+                                hasRun = false;
+                            }
+                            if (c.IEmojiRender != null) {
+                                c.IEmojiRender.DrawEmoji(render, surrogateStr, baseX + offsets[i] + (nCharSpacing >> 1), nY + nLineSpacing, c.FontHeight, isSelectionPass);
+                            }
+                            i++;
+                            continue;
+                        }
                     }
-                    runStart = i;
-                    runStartX = baseX + offsets[i];
-                    runStyle = style;
-                    runIsSelected = isSel;
+
+                    var syntaxStyle = c.GetStyleFromCharIndex(charIdx);
+                    if (syntaxStyle.ForeColor.A == 0) syntaxStyle.ForeColor = c.TextBox.ForeColor;
+
+                    if (!hasRun) {
+                        runStart = i;
+                        runStartX = baseX + offsets[i];
+                        syntaxRunStyle = syntaxStyle;
+                        hasRun = true;
+                    } else if (syntaxRunStyle.ForeColor != syntaxStyle.ForeColor || syntaxRunStyle.BackColor != syntaxStyle.BackColor || syntaxRunStyle.FontStyle != syntaxStyle.FontStyle) {
+                        int runLen = i - runStart;
+                        if (runLen > 0) {
+                            string runStr = raw.Substring(runStart, runLen);
+                            int runWidth = offsets[i] - offsets[runStart];
+                            TextStyle drawStyle = syntaxRunStyle;
+                            if (isSelectionPass) {
+                                drawStyle.ForeColor = selTextColor;
+                                drawStyle.BackColor = Color.Transparent;
+                            }
+                            render.DrawString(runStr, drawStyle, new Rectangle(runStartX, nY, runWidth, c.LineHeight));
+                        }
+                        runStart = i;
+                        runStartX = baseX + offsets[i];
+                        syntaxRunStyle = syntaxStyle;
+                    }
+                }
+
+                if (hasRun && drawLength > runStart) {
+                    int runLen = drawLength - runStart;
+                    string runStr = raw.Substring(runStart, runLen);
+                    int runWidth = offsets[drawLength] - offsets[runStart];
+                    TextStyle drawStyle = syntaxRunStyle;
+                    if (isSelectionPass) {
+                        drawStyle.ForeColor = selTextColor;
+                        drawStyle.BackColor = Color.Transparent;
+                    }
+                    render.DrawString(runStr, drawStyle, new Rectangle(runStartX, nY, runWidth, c.LineHeight));
                 }
             }
 
-            if (hasRun && drawLength > runStart) {
-                int runLen = drawLength - runStart;
-                string runStr = raw.Substring(runStart, runLen);
-                int runWidth = offsets[drawLength] - offsets[runStart];
-                render.DrawString(runStr, runStyle, new Rectangle(runStartX, nY, runWidth, c.LineHeight));
+            // Pass 1: Render line with normal syntax styles (stable token boundaries prevent GDI+ ClearType glyph shifting)
+            DrawRuns(false);
+
+            // Pass 2: If line intersects selection, use clip to re-render selection with selTextColor without re-chunking strings
+            if (hasSelection && selTextColor != Color.Empty) {
+                int selStartCol = Math.Max(0, Math.Min(drawLength, selStart - lineStart));
+                int selEndCol = Math.Max(0, Math.Min(drawLength, selEnd - lineStart));
+                if (selEndCol > selStartCol) {
+                    int selStartX = baseX + offsets[selStartCol];
+                    int selEndX = baseX + offsets[selEndCol];
+                    int selWidth = selEndX - selStartX;
+                    if (selWidth > 0) {
+                        Rectangle selClip = new Rectangle(selStartX, nY, selWidth, c.LineHeight + LINE_OVERLAP_MARGIN);
+                        selClip.Intersect(base.TextRectangle);
+                        if (selClip.Width > 0 && selClip.Height > 0) {
+                            render.SetClip(selClip);
+                            DrawRuns(true);
+                            render.SetClip(base.TextRectangle);
+                        }
+                    }
+                }
             }
 
             return c.LineHeight;

@@ -608,65 +608,28 @@ namespace ST.Library.UI.STTextBox
                     int drawX = nX + subLine.X;
                     int subWidth = (subLine.Offsets != null && subLen < subLine.Offsets.Length) ? subLine.Offsets[subLen] : subLine.Width;
 
-                    // Check if subline contains tabs or surrogate pairs (emojis)
-                    bool hasSpecialChars = false;
-                    for (int j = 0; j < subLen; j++) {
-                        char ch = raw[subLine.Index + j];
-                        if (ch == '\t' || ch >= 0xD800) {
-                            hasSpecialChars = true;
-                            break;
-                        }
-                    }
-
                     bool hasSelection = !isSelectionEmpty && !(subStartChar >= selEnd || (subStartChar + subLen) <= selStart);
 
-                    if (!hasSpecialChars) {
-                        // High-speed path: Dual-pass clip rendering for silky-smooth, jitter-free display!
-                        string subStr = raw.Substring(subLine.Index, subLen);
-                        TextStyle style = c.GetStyleFromCharIndex(subStartChar);
-                        if (style.ForeColor.A == 0) style.ForeColor = c.TextBox.ForeColor;
-
-                        // Pass 1: Render full subline
-                        render.DrawString(subStr, style, new Rectangle(drawX, nY, subWidth, c.LineHeight));
-
-                        // Pass 2: Clip to selection if selected
-                        if (hasSelection && selTextColor != style.ForeColor) {
-                            int relSelStart = Math.Max(0, selStart - subStartChar);
-                            int relSelEnd = Math.Min(subLen, selEnd - subStartChar);
-                            if (relSelEnd > relSelStart && subLine.Offsets != null) {
-                                int selLeftX = drawX + subLine.Offsets[relSelStart];
-                                int selRightX = drawX + subLine.Offsets[relSelEnd];
-                                int selW = selRightX - selLeftX;
-                                if (selW > 0) {
-                                    Rectangle selClip = new Rectangle(selLeftX, nY, selW, c.LineHeight);
-                                    selClip.Intersect(base.TextRectangle);
-                                    if (selClip.Width > 0 && selClip.Height > 0) {
-                                        render.SetClip(selClip);
-                                        TextStyle selStyle = style;
-                                        selStyle.ForeColor = selTextColor;
-                                        render.DrawString(subStr, selStyle, new Rectangle(drawX, nY, subWidth, c.LineHeight));
-                                        render.SetClip(base.TextRectangle);
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        // General path for emojis/tabs: batched runs using subLine.Offsets
+                    void DrawSubLineRuns(bool isSelectionPass) {
                         int runStart = 0;
                         int runStartX = drawX;
-                        TextStyle runStyle = TextStyle.Empty;
+                        TextStyle syntaxRunStyle = TextStyle.Empty;
                         bool hasRun = false;
 
                         for (int j = 0; j < subLen; j++) {
                             char ch = raw[subLine.Index + j];
                             int charIdx = subStartChar + j;
-                            bool isSel = hasSelection && (charIdx >= selStart && charIdx < selEnd);
 
                             if (ch == '\t') {
                                 if (hasRun && j > runStart) {
                                     string runStr = raw.Substring(subLine.Index + runStart, j - runStart);
                                     int runW = subLine.Offsets[j] - subLine.Offsets[runStart];
-                                    render.DrawString(runStr, runStyle, new Rectangle(runStartX, nY, runW, c.LineHeight));
+                                    TextStyle drawStyle = syntaxRunStyle;
+                                    if (isSelectionPass) {
+                                        drawStyle.ForeColor = selTextColor;
+                                        drawStyle.BackColor = Color.Transparent;
+                                    }
+                                    render.DrawString(runStr, drawStyle, new Rectangle(runStartX, nY, runW, c.LineHeight));
                                     hasRun = false;
                                 }
                                 continue;
@@ -678,43 +641,78 @@ namespace ST.Library.UI.STTextBox
                                     if (hasRun && j > runStart) {
                                         string runStr = raw.Substring(subLine.Index + runStart, j - runStart);
                                         int runW = subLine.Offsets[j] - subLine.Offsets[runStart];
-                                        render.DrawString(runStr, runStyle, new Rectangle(runStartX, nY, runW, c.LineHeight));
+                                        TextStyle drawStyle = syntaxRunStyle;
+                                        if (isSelectionPass) {
+                                            drawStyle.ForeColor = selTextColor;
+                                            drawStyle.BackColor = Color.Transparent;
+                                        }
+                                        render.DrawString(runStr, drawStyle, new Rectangle(runStartX, nY, runW, c.LineHeight));
                                         hasRun = false;
                                     }
                                     if (c.IEmojiRender != null) {
                                         int emojiX = drawX + (subLine.Offsets != null ? subLine.Offsets[j] : 0);
-                                        c.IEmojiRender.DrawEmoji(render, surrogateStr, emojiX + (nCharSpacing >> 1), nY + nLineSpacing, c.FontHeight, isSel);
+                                        c.IEmojiRender.DrawEmoji(render, surrogateStr, emojiX + (nCharSpacing >> 1), nY + nLineSpacing, c.FontHeight, isSelectionPass);
                                     }
                                     j++;
                                     continue;
                                 }
                             }
 
-                            var style = c.GetStyleFromCharIndex(charIdx);
-                            if (style.ForeColor.A == 0) style.ForeColor = c.TextBox.ForeColor;
-                            if (isSel && selTextColor != Color.Empty) {
-                                style.ForeColor = selTextColor;
-                            }
+                            var syntaxStyle = c.GetStyleFromCharIndex(charIdx);
+                            if (syntaxStyle.ForeColor.A == 0) syntaxStyle.ForeColor = c.TextBox.ForeColor;
 
                             if (!hasRun) {
                                 runStart = j;
                                 runStartX = drawX + (subLine.Offsets != null ? subLine.Offsets[j] : 0);
-                                runStyle = style;
+                                syntaxRunStyle = syntaxStyle;
                                 hasRun = true;
-                            } else if (style.ForeColor != runStyle.ForeColor || style.FontStyle != runStyle.FontStyle) {
+                            } else if (syntaxStyle.ForeColor != syntaxRunStyle.ForeColor || syntaxStyle.BackColor != syntaxRunStyle.BackColor || syntaxStyle.FontStyle != syntaxRunStyle.FontStyle) {
                                 string runStr = raw.Substring(subLine.Index + runStart, j - runStart);
                                 int runW = subLine.Offsets[j] - subLine.Offsets[runStart];
-                                render.DrawString(runStr, runStyle, new Rectangle(runStartX, nY, runW, c.LineHeight));
+                                TextStyle drawStyle = syntaxRunStyle;
+                                if (isSelectionPass) {
+                                    drawStyle.ForeColor = selTextColor;
+                                    drawStyle.BackColor = Color.Transparent;
+                                }
+                                render.DrawString(runStr, drawStyle, new Rectangle(runStartX, nY, runW, c.LineHeight));
                                 runStart = j;
                                 runStartX = drawX + (subLine.Offsets != null ? subLine.Offsets[j] : 0);
-                                runStyle = style;
+                                syntaxRunStyle = syntaxStyle;
                             }
                         }
 
                         if (hasRun && subLen > runStart) {
                             string runStr = raw.Substring(subLine.Index + runStart, subLen - runStart);
                             int runW = subLine.Offsets[subLen] - subLine.Offsets[runStart];
-                            render.DrawString(runStr, runStyle, new Rectangle(runStartX, nY, runW, c.LineHeight));
+                            TextStyle drawStyle = syntaxRunStyle;
+                            if (isSelectionPass) {
+                                drawStyle.ForeColor = selTextColor;
+                                drawStyle.BackColor = Color.Transparent;
+                            }
+                            render.DrawString(runStr, drawStyle, new Rectangle(runStartX, nY, runW, c.LineHeight));
+                        }
+                    }
+
+                    // Pass 1: Render subline with syntax styles
+                    DrawSubLineRuns(false);
+
+                    // Pass 2: Clip to selection if selected
+                    if (hasSelection && selTextColor != Color.Empty) {
+                        int relSelStart = Math.Max(0, selStart - subStartChar);
+                        int relSelEnd = Math.Min(subLen, selEnd - subStartChar);
+                        if (relSelEnd > relSelStart && subLine.Offsets != null) {
+                            int selLeftX = drawX + subLine.Offsets[relSelStart];
+                            int selRightX = drawX + subLine.Offsets[relSelEnd];
+                            int selW = selRightX - selLeftX;
+                            if (selW > 0) {
+                                Rectangle selClip = new Rectangle(selLeftX, nY, selW, c.LineHeight + 1);
+                                selClip.Intersect(base.TextRectangle);
+                                if (selClip.Width > 0 && selClip.Height > 0) {
+                                    render.SetClip(selClip);
+                                    DrawSubLineRuns(true);
+                                    render.SetClip(base.TextRectangle);
+                                }
+                            }
                         }
                     }
                 }
