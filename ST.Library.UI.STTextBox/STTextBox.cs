@@ -293,6 +293,18 @@ namespace ST.Library.UI.STTextBox
             m_core.ITextView.OnCalcScroll(m_core.Scroll);
         }
 
+        protected override void OnFontChanged(EventArgs e) {
+            base.OnFontChanged(e);
+            if (m_core != null && m_core.ITextView != null) {
+                m_core.ITextView.Init(m_core);
+                m_core.ITextView.OnCalcTextRectangle();
+                if (m_core.Scroll != null) {
+                    m_core.ITextView.OnCalcScroll(m_core.Scroll);
+                }
+                this.Invalidate();
+            }
+        }
+
         protected override void OnGotFocus(EventArgs e) {
             base.OnGotFocus(e);
             Win32.CreateCaret(this.Handle, IntPtr.Zero, this.GetIntXSize(1), m_core.LineHeight);

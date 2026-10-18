@@ -567,5 +567,80 @@ namespace STTextBox.Tests
                 Assert.False(tbx.WordWrap);
             }
         }
+
+        [Fact]
+        public void ProportionalFont_SwitchingAndSelection_WorksCorrectly()
+        {
+            using (var tbx = new ST.Library.UI.STTextBox.STTextBox())
+            using (var gdiRender = new STTextBoxGDIRender())
+            using (var gdipRender = new STTextBoxGDIPRender()) {
+                tbx.SetBounds(0, 0, 500, 300);
+                tbx.SetTextBoxRender(gdiRender);
+
+                // Initially with Consolas (Monospaced)
+                tbx.Font = new Font("Consolas", 10.5f);
+                Assert.True(gdiRender.IsMonospaced);
+
+                // Switch to Segoe UI (Proportional)
+                tbx.Font = new Font("Segoe UI", 10.5f);
+                Assert.False(gdiRender.IsMonospaced);
+
+                // Text with starkly varying character widths: 'i' vs 'W'
+                string text = "iiiiWWWWiiiiWWWW\r\nThe quick brown fox jumps over the lazy dog.\r\nProportional fonts accurately measured.";
+                tbx.SetText(text);
+
+                var core = typeof(ST.Library.UI.STTextBox.STTextBox).GetField("m_core", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(tbx) as ST.Library.UI.STTextBox.STTextBox.Core;
+                Assert.False(core.IsMonospaced);
+
+                // Test QuickTextView with proportional font
+                var quickView = new QuickTextView();
+                tbx.SetTextView(quickView);
+
+                quickView.SetCaretPostion(4);
+                Assert.Equal(4, core.Caret.IndexOfChar);
+                quickView.SetCaretPostion(8);
+                Assert.Equal(8, core.Caret.IndexOfChar);
+
+                // Selection across variable-width characters
+                core.Selection.SetSelection(0, 8);
+                Assert.Equal(8, core.Selection.Length);
+
+                using (var bmp = new Bitmap(tbx.Width, tbx.Height)) {
+                    tbx.DrawToBitmap(bmp, new Rectangle(0, 0, tbx.Width, tbx.Height));
+                    Assert.NotNull(bmp);
+                }
+
+                // Test NoWrapTextView with proportional font
+                var noWrapView = new NoWrapTextView();
+                tbx.SetTextView(noWrapView);
+                noWrapView.SetCaretPostion(8);
+                Assert.Equal(8, core.Caret.IndexOfChar);
+
+                using (var bmp = new Bitmap(tbx.Width, tbx.Height)) {
+                    tbx.DrawToBitmap(bmp, new Rectangle(0, 0, tbx.Width, tbx.Height));
+                    Assert.NotNull(bmp);
+                }
+
+                // Test WrapTextView with proportional font
+                var wrapView = new WrapTextView(WrapTextView.Method.Word, WrapTextView.Alignment.Left);
+                tbx.SetTextView(wrapView);
+                wrapView.SetCaretPostion(8);
+                Assert.Equal(8, core.Caret.IndexOfChar);
+
+                using (var bmp = new Bitmap(tbx.Width, tbx.Height)) {
+                    tbx.DrawToBitmap(bmp, new Rectangle(0, 0, tbx.Width, tbx.Height));
+                    Assert.NotNull(bmp);
+                }
+
+                // Test switching to GDI+ renderer with proportional font
+                tbx.SetTextBoxRender(gdipRender);
+                Assert.False(gdipRender.IsMonospaced);
+
+                using (var bmp = new Bitmap(tbx.Width, tbx.Height)) {
+                    tbx.DrawToBitmap(bmp, new Rectangle(0, 0, tbx.Width, tbx.Height));
+                    Assert.NotNull(bmp);
+                }
+            }
+        }
     }
 }

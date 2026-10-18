@@ -20,6 +20,7 @@ namespace STTextBoxTest.Demos
         private ToolStripStatusLabel m_lblSelection;
         private ToolStripStatusLabel m_lblStats;
         private ToolStripComboBox m_cboSize;
+        private ToolStripComboBox m_cboFont;
         private ToolStripComboBox m_cboRenderer;
         private ToolStripComboBox m_cboView;
         private ToolStripComboBox m_cboAlignment;
@@ -67,6 +68,8 @@ namespace STTextBoxTest.Demos
                 "150 lines x 120 chars (ASCII)",
                 "300 lines x 140 chars (ASCII)",
                 "1000 lines x 120 chars (ASCII)",
+                "100 lines (Natural English Prose / Articles)",
+                "500 lines (Natural English Prose / Articles)",
                 "60 lines x 50 chars (Chinese / 中文)",
                 "300 lines x 50 chars (Chinese / 中文)",
                 "100 lines (Mixed English & Chinese / 中英混合)"
@@ -74,6 +77,25 @@ namespace STTextBoxTest.Demos
             m_cboSize.SelectedIndex = 0;
             m_cboSize.SelectedIndexChanged += (s, ev) => OnRegenerateClicked();
             toolStrip.Items.Add(m_cboSize);
+
+            toolStrip.Items.Add(new ToolStripSeparator());
+
+            toolStrip.Items.Add(new ToolStripLabel("Font:"));
+            m_cboFont = new ToolStripComboBox();
+            m_cboFont.DropDownStyle = ComboBoxStyle.DropDownList;
+            m_cboFont.Items.AddRange(new object[] {
+                "Segoe UI (10.5 pt) - Proportional",
+                "Calibri (11 pt) - Proportional",
+                "Arial (10 pt) - Proportional",
+                "Georgia (10.5 pt) - Proportional Serif",
+                "Times New Roman (11 pt) - Proportional Serif",
+                "Consolas (10.5 pt) - Monospaced",
+                "Courier New (10 pt) - Monospaced",
+                "Cascadia Code (10 pt) - Monospaced"
+            });
+            m_cboFont.SelectedIndex = 0;
+            m_cboFont.SelectedIndexChanged += (s, ev) => OnFontChanged();
+            toolStrip.Items.Add(m_cboFont);
 
             toolStrip.Items.Add(new ToolStripSeparator());
 
@@ -150,7 +172,7 @@ namespace STTextBoxTest.Demos
             // STTextBox in Center
             m_tbx = new STTextBox();
             m_tbx.Dock = DockStyle.Fill;
-            m_tbx.Font = new Font("Consolas", 10.5f);
+            m_tbx.Font = new Font("Segoe UI", 10.5f);
             m_tbx.SelectionColor = Color.FromArgb(0, 120, 215);
             m_tbx.SelectedTextColor = Color.White;
 
@@ -184,15 +206,36 @@ namespace STTextBoxTest.Demos
                 case 1: lines = 150; cols = 120; break;
                 case 2: lines = 300; cols = 140; break;
                 case 3: lines = 1000; cols = 120; break;
-                case 4: lines = 60; cols = 50; break;
-                case 5: lines = 300; cols = 50; break;
-                case 6: lines = 100; cols = 80; break;
+                case 4: lines = 100; break;
+                case 5: lines = 500; break;
+                case 6: lines = 60; cols = 50; break;
+                case 7: lines = 300; cols = 50; break;
+                case 8: lines = 100; cols = 80; break;
             }
-            if (mode >= 4) {
-                PopulateChineseText(lines, cols, mode == 6);
+            if (mode == 4 || mode == 5) {
+                PopulateProseText(lines);
+            } else if (mode >= 6) {
+                PopulateChineseText(lines, cols, mode == 8);
             } else {
                 PopulateDummyText(lines, cols);
             }
+            UpdateStatus();
+        }
+
+        private void OnFontChanged() {
+            Font font;
+            switch (m_cboFont.SelectedIndex) {
+                case 0: font = new Font("Segoe UI", 10.5f); break;
+                case 1: font = new Font("Calibri", 11f); break;
+                case 2: font = new Font("Arial", 10f); break;
+                case 3: font = new Font("Georgia", 10.5f); break;
+                case 4: font = new Font("Times New Roman", 11f); break;
+                case 5: font = new Font("Consolas", 10.5f); break;
+                case 6: font = new Font("Courier New", 10f); break;
+                case 7: font = new Font("Cascadia Code", 10f); break;
+                default: font = new Font("Segoe UI", 10.5f); break;
+            }
+            m_tbx.Font = font;
             UpdateStatus();
         }
 
@@ -336,6 +379,32 @@ namespace STTextBoxTest.Demos
             }
         }
 
+        private void PopulateProseText(int paragraphs) {
+            StringBuilder s = new StringBuilder();
+            Random r = new Random(42);
+            string[] sampleSentences = new string[] {
+                "High performance text rendering requires efficient layout algorithms, low-overhead grapheme cluster detection, and cache-friendly data structures.",
+                "The quick brown fox jumps over the lazy dog while software engineers benchmark text layout and selection speed across various typographic styles.",
+                "Proportional typefaces introduce variable character advances, requiring individual glyph measurements or optimized proportional advance lookup tables.",
+                "When rendering complex documents with word wrapping and multi-lingual scripts, line break analysis must respect Unicode boundaries and character classification rules.",
+                "Hardware-accelerated graphics interfaces and low-level GDI drawing routines provide smooth 60+ FPS scrolling and sub-millisecond mouse hit-testing.",
+                "Text selection in modern editors demands sub-pixel visual accuracy, contrasting inverted foreground highlights, and seamless multi-line block painting.",
+                "By avoiding redundant string measurement and caching character boundaries along visible viewport spans, interactive responsiveness remains virtually instantaneous.",
+                "Modern typographic layouts support multiple alignments including left-aligned, right-aligned, and centered text with balanced line breaks."
+            };
+
+            for (int i = 0; i < paragraphs; i++) {
+                StringBuilder para = new StringBuilder();
+                int sentenceCount = r.Next(3, 7);
+                for (int j = 0; j < sentenceCount; j++) {
+                    if (j > 0) para.Append(" ");
+                    para.Append(sampleSentences[r.Next(sampleSentences.Length)]);
+                }
+                s.AppendLine(para.ToString());
+            }
+            m_tbx.SetText(s.ToString());
+        }
+
         private void UpdateStatus() {
             var c = typeof(STTextBox).GetField("m_core", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(m_tbx) as STTextBox.Core;
             if (c != null) {
@@ -353,7 +422,9 @@ namespace STTextBoxTest.Demos
                     case 2: viewName = string.Format("WrapTextView (Word, {0})", m_cboAlignment.SelectedItem ?? "Left"); break;
                     case 3: viewName = string.Format("WrapTextView (Char, {0})", m_cboAlignment.SelectedItem ?? "Left"); break;
                 }
-                m_lblStats.Text = string.Format("Mode: {0} + {1} | Total Lines: {2}", rendererName, viewName, c.TextManager.LineCount);
+                string fontKind = c.IsMonospaced ? "Mono" : "Proportional";
+                string fontName = string.Format("{0} {1}pt ({2})", m_tbx.Font.Name, m_tbx.Font.SizeInPoints, fontKind);
+                m_lblStats.Text = string.Format("Mode: {0} + {1} | Font: {2} | Total Lines: {3}", rendererName, viewName, fontName, c.TextManager.LineCount);
             }
         }
     }
