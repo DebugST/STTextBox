@@ -212,6 +212,9 @@ namespace ST.Library.UI.STTextBox
             if ((ft.Style & FontStyle.Italic) == FontStyle.Italic) {
                 fWidth += m_italic_width;
             }
+            if (m_dic_width_cache_float.Count >= 1024) {
+                m_dic_width_cache_float.Clear();
+            }
             m_dic_width_cache_float[strKey] = fWidth;
             return fWidth;
         }

@@ -36,6 +36,7 @@ namespace ST.Library.UI.STTextBox
             public int CharCount;
             public int[] GraphemeLengths;
             public float[] GraphemeWidths;
+            public bool IsUniformMono;
         }
 
         private class SubLineInfo
@@ -54,6 +55,31 @@ namespace ST.Library.UI.STTextBox
         private int m_n_line_count_start_change = 0;
         private HashSet<TextLine> m_hs_changed_temp = new HashSet<TextLine>();
         private readonly Dictionary<char, float> m_dic_char_widths = new Dictionary<char, float>();
+
+        private readonly WordInfo m_scratch_word_info = new WordInfo();
+        private readonly List<int> m_scratch_glens = new List<int>(64);
+        private readonly List<float> m_scratch_gwidths = new List<float>(64);
+
+        private static bool IsPureAsciiNoTabs(string text) {
+            if (string.IsNullOrEmpty(text)) return true;
+            for (int i = 0; i < text.Length; i++) {
+                char ch = text[i];
+                if (ch < 32 || ch > 126) {
+                    if (ch != '\r' && ch != '\n') return false;
+                }
+            }
+            return true;
+        }
+
+        private int GetSubLineOffset(SubLineInfo subLine, int index) {
+            if (subLine.Offsets != null) {
+                if (index < subLine.Offsets.Length) return subLine.Offsets[index];
+                return subLine.Width;
+            }
+            var c = base.Core;
+            float mono = c.ITextBoxRender.CharWidthFloat > 0f ? c.ITextBoxRender.CharWidthFloat : (float)c.ITextBoxRender.GetSpaceWidth();
+            return (int)Math.Round(Math.Min(index, subLine.Length) * mono);
+        }
 
         private readonly StringFormat m_sf = new StringFormat(StringFormat.GenericTypographic) {
             Alignment = StringAlignment.Far,
@@ -208,10 +234,14 @@ namespace ST.Library.UI.STTextBox
             }
             nTextViewLineWidth = Math.Max(1f, nTextViewLineWidth);
 
+            bool isMono = c.ITextBoxRender.IsMonospaced && (c.TextBox.CharSpacing == 0);
+            float monoAdvance = c.ITextBoxRender.CharWidthFloat > 0f ? c.ITextBoxRender.CharWidthFloat : (float)c.ITextBoxRender.GetSpaceWidth();
+            bool isPureAsciiLine = isMono && monoAdvance > 0f && IsPureAsciiNoTabs(line.RawString);
+
             float nLineWidth = 0f;
             int nSubStrLen = 0;
             int nCharCount = 0;
-            List<int> curOffsets = new List<int>() { 0 };
+            List<int> curOffsets = isPureAsciiLine ? null : new List<int>() { 0 };
 
             c.IGraphemeSplitter.Each(line.RawString, nStartIndex, (str, nStart, nLen) => {
                 string strChar = str.Substring(nStart, nLen);
@@ -229,25 +259,31 @@ namespace ST.Library.UI.STTextBox
                         Length = nSubStrLen,
                         CharCount = nCharCount,
                         Width = (int)Math.Round(nLineWidth),
-                        Offsets = curOffsets.ToArray()
+                        Offsets = curOffsets != null ? curOffsets.ToArray() : null
                     });
-                    curOffsets.Clear();
-                    curOffsets.Add(0);
+                    if (curOffsets != null) {
+                        curOffsets.Clear();
+                        curOffsets.Add(0);
+                    }
                     nCharCount = 1;
                     nStartIndex += nSubStrLen;
                     nSubStrLen = nLen;
                     nLineWidth = nCharWidth;
-                    int off = (int)Math.Round(nLineWidth);
-                    for (int k = 1; k <= nLen; k++) {
-                        curOffsets.Add(off);
+                    if (curOffsets != null) {
+                        int off = (int)Math.Round(nLineWidth);
+                        for (int k = 1; k <= nLen; k++) {
+                            curOffsets.Add(off);
+                        }
                     }
                 } else {
                     nSubStrLen += nLen;
                     nLineWidth += nCharWidth;
                     nCharCount++;
-                    int off = (int)Math.Round(nLineWidth);
-                    for (int k = 1; k <= nLen; k++) {
-                        curOffsets.Add(off);
+                    if (curOffsets != null) {
+                        int off = (int)Math.Round(nLineWidth);
+                        for (int k = 1; k <= nLen; k++) {
+                            curOffsets.Add(off);
+                        }
                     }
                 }
                 return true;
@@ -257,7 +293,7 @@ namespace ST.Library.UI.STTextBox
                 Length = nSubStrLen,
                 CharCount = nCharCount,
                 Width = (int)Math.Round(nLineWidth),
-                Offsets = curOffsets.ToArray()
+                Offsets = curOffsets != null ? curOffsets.ToArray() : null
             });
         }
 
@@ -269,12 +305,16 @@ namespace ST.Library.UI.STTextBox
             }
             nTextViewLineWidth = Math.Max(1f, nTextViewLineWidth);
 
+            bool isMono = c.ITextBoxRender.IsMonospaced && (c.TextBox.CharSpacing == 0);
+            float monoAdvance = c.ITextBoxRender.CharWidthFloat > 0f ? c.ITextBoxRender.CharWidthFloat : (float)c.ITextBoxRender.GetSpaceWidth();
+            bool isPureAsciiLine = isMono && monoAdvance > 0f && IsPureAsciiNoTabs(line.RawString);
+
             List<SubLineInfo> lst = new List<SubLineInfo>();
             int curSubStart = 0;
             int curSubLen = 0;
             float curSubWidth = 0f;
             int curCharCount = 0;
-            List<int> curOffsets = new List<int>() { 0 };
+            List<int> curOffsets = isPureAsciiLine ? null : new List<int>() { 0 };
 
             c.IWordSplitter.Each(line.RawString, (str, nStart, nLen) => {
                 string strWord = str.Substring(nStart, nLen);
@@ -282,30 +322,62 @@ namespace ST.Library.UI.STTextBox
 
                 if (wi.Width >= nTextViewLineWidth) {
                     // Single word is wider than the entire line -> split character by character
-                    for (int g = 0; g < wi.GraphemeLengths.Length; g++) {
-                        int gLen = wi.GraphemeLengths[g];
-                        float gWidth = wi.GraphemeWidths[g];
-                        if (curSubWidth + gWidth >= nTextViewLineWidth && curSubLen > 0) {
-                            lst.Add(new SubLineInfo() {
-                                Index = curSubStart,
-                                Length = curSubLen,
-                                CharCount = curCharCount,
-                                Width = (int)Math.Round(curSubWidth),
-                                Offsets = curOffsets.ToArray()
-                            });
-                            curSubStart += curSubLen;
-                            curSubLen = 0;
-                            curSubWidth = 0f;
-                            curCharCount = 0;
-                            curOffsets.Clear();
-                            curOffsets.Add(0);
+                    if (wi.IsUniformMono) {
+                        for (int g = 0; g < wi.CharCount; g++) {
+                            if (curSubWidth + monoAdvance >= nTextViewLineWidth && curSubLen > 0) {
+                                lst.Add(new SubLineInfo() {
+                                    Index = curSubStart,
+                                    Length = curSubLen,
+                                    CharCount = curCharCount,
+                                    Width = (int)Math.Round(curSubWidth),
+                                    Offsets = curOffsets != null ? curOffsets.ToArray() : null
+                                });
+                                curSubStart += curSubLen;
+                                curSubLen = 0;
+                                curSubWidth = 0f;
+                                curCharCount = 0;
+                                if (curOffsets != null) {
+                                    curOffsets.Clear();
+                                    curOffsets.Add(0);
+                                }
+                            }
+                            curSubLen += 1;
+                            curSubWidth += monoAdvance;
+                            curCharCount++;
+                            if (curOffsets != null) {
+                                curOffsets.Add((int)Math.Round(curSubWidth));
+                            }
                         }
-                        curSubLen += gLen;
-                        curSubWidth += gWidth;
-                        curCharCount++;
-                        int off = (int)Math.Round(curSubWidth);
-                        for (int k = 1; k <= gLen; k++) {
-                            curOffsets.Add(off);
+                    } else {
+                        for (int g = 0; g < wi.GraphemeLengths.Length; g++) {
+                            int gLen = wi.GraphemeLengths[g];
+                            float gWidth = wi.GraphemeWidths[g];
+                            if (curSubWidth + gWidth >= nTextViewLineWidth && curSubLen > 0) {
+                                lst.Add(new SubLineInfo() {
+                                    Index = curSubStart,
+                                    Length = curSubLen,
+                                    CharCount = curCharCount,
+                                    Width = (int)Math.Round(curSubWidth),
+                                    Offsets = curOffsets != null ? curOffsets.ToArray() : null
+                                });
+                                curSubStart += curSubLen;
+                                curSubLen = 0;
+                                curSubWidth = 0f;
+                                curCharCount = 0;
+                                if (curOffsets != null) {
+                                    curOffsets.Clear();
+                                    curOffsets.Add(0);
+                                }
+                            }
+                            curSubLen += gLen;
+                            curSubWidth += gWidth;
+                            curCharCount++;
+                            if (curOffsets != null) {
+                                int off = (int)Math.Round(curSubWidth);
+                                for (int k = 1; k <= gLen; k++) {
+                                    curOffsets.Add(off);
+                                }
+                            }
                         }
                     }
                     return true;
@@ -318,26 +390,41 @@ namespace ST.Library.UI.STTextBox
                         Length = curSubLen,
                         CharCount = curCharCount,
                         Width = (int)Math.Round(curSubWidth),
-                        Offsets = curOffsets.ToArray()
+                        Offsets = curOffsets != null ? curOffsets.ToArray() : null
                     });
                     curSubStart += curSubLen;
                     curSubLen = 0;
                     curSubWidth = 0f;
                     curCharCount = 0;
-                    curOffsets.Clear();
-                    curOffsets.Add(0);
+                    if (curOffsets != null) {
+                        curOffsets.Clear();
+                        curOffsets.Add(0);
+                    }
                 }
 
                 // Add the word to the current subline
-                for (int g = 0; g < wi.GraphemeLengths.Length; g++) {
-                    int gLen = wi.GraphemeLengths[g];
-                    float gWidth = wi.GraphemeWidths[g];
-                    curSubLen += gLen;
-                    curSubWidth += gWidth;
-                    curCharCount++;
-                    int off = (int)Math.Round(curSubWidth);
-                    for (int k = 1; k <= gLen; k++) {
-                        curOffsets.Add(off);
+                if (wi.IsUniformMono) {
+                    curSubLen += wi.CharCount;
+                    curSubWidth += wi.Width;
+                    curCharCount += wi.CharCount;
+                    if (curOffsets != null) {
+                        for (int g = 0; g < wi.CharCount; g++) {
+                            curOffsets.Add((int)Math.Round(curSubWidth - (wi.CharCount - 1 - g) * monoAdvance));
+                        }
+                    }
+                } else {
+                    for (int g = 0; g < wi.GraphemeLengths.Length; g++) {
+                        int gLen = wi.GraphemeLengths[g];
+                        float gWidth = wi.GraphemeWidths[g];
+                        curSubLen += gLen;
+                        curSubWidth += gWidth;
+                        curCharCount++;
+                        if (curOffsets != null) {
+                            int off = (int)Math.Round(curSubWidth);
+                            for (int k = 1; k <= gLen; k++) {
+                                curOffsets.Add(off);
+                            }
+                        }
                     }
                 }
                 return true;
@@ -348,7 +435,7 @@ namespace ST.Library.UI.STTextBox
                 Length = curSubLen,
                 CharCount = curCharCount,
                 Width = (int)Math.Round(curSubWidth),
-                Offsets = curOffsets.ToArray()
+                Offsets = curOffsets != null ? curOffsets.ToArray() : null
             });
 
             return lst;
@@ -357,17 +444,30 @@ namespace ST.Library.UI.STTextBox
         private WordInfo GetWordInfo(TextLine line, ISTTextBoxRender render, string strWord, int nIndex, float nLeftWidth) {
             var c = base.Core;
             if (strWord == "\r\n" || strWord == "\r" || strWord == "\n") {
-                return new WordInfo() {
-                    Width = 0f,
-                    CharCount = 1,
-                    GraphemeLengths = new int[] { strWord.Length },
-                    GraphemeWidths = new float[] { 0f }
-                };
+                m_scratch_word_info.Width = 0f;
+                m_scratch_word_info.CharCount = 1;
+                m_scratch_word_info.GraphemeLengths = null;
+                m_scratch_word_info.GraphemeWidths = null;
+                m_scratch_word_info.IsUniformMono = true;
+                return m_scratch_word_info;
             }
+
+            bool isMono = c.ITextBoxRender.IsMonospaced && (c.TextBox.CharSpacing == 0);
+            float monoAdvance = c.ITextBoxRender.CharWidthFloat > 0f ? c.ITextBoxRender.CharWidthFloat : (float)c.ITextBoxRender.GetSpaceWidth();
+
+            if (isMono && monoAdvance > 0f && IsPureAsciiNoTabs(strWord)) {
+                m_scratch_word_info.Width = strWord.Length * monoAdvance;
+                m_scratch_word_info.CharCount = strWord.Length;
+                m_scratch_word_info.GraphemeLengths = null;
+                m_scratch_word_info.GraphemeWidths = null;
+                m_scratch_word_info.IsUniformMono = true;
+                return m_scratch_word_info;
+            }
+
             float nWordWidth = 0f;
             int nCharCount = 0;
-            List<int> gLens = new List<int>();
-            List<float> gWidths = new List<float>();
+            m_scratch_glens.Clear();
+            m_scratch_gwidths.Clear();
 
             c.IGraphemeSplitter.Each(strWord, (s, ns, nl) => {
                 string strChar = s.Substring(ns, nl);
@@ -379,17 +479,18 @@ namespace ST.Library.UI.STTextBox
                 } else {
                     nCharWidth = GetCharWidthFastFloat(c, line, nIndex + ns, strChar, nLeftWidth + nWordWidth);
                 }
-                gLens.Add(nl);
-                gWidths.Add(nCharWidth);
+                m_scratch_glens.Add(nl);
+                m_scratch_gwidths.Add(nCharWidth);
                 nWordWidth += nCharWidth;
                 nCharCount++;
             });
-            return new WordInfo() {
-                Width = nWordWidth,
-                CharCount = nCharCount,
-                GraphemeLengths = gLens.ToArray(),
-                GraphemeWidths = gWidths.ToArray()
-            };
+
+            m_scratch_word_info.Width = nWordWidth;
+            m_scratch_word_info.CharCount = nCharCount;
+            m_scratch_word_info.GraphemeLengths = m_scratch_glens.ToArray();
+            m_scratch_word_info.GraphemeWidths = m_scratch_gwidths.ToArray();
+            m_scratch_word_info.IsUniformMono = false;
+            return m_scratch_word_info;
         }
 
         public override void OnTextChanged(ISTTextBoxRender render, TextManagerTextEventArgs e) {
@@ -480,8 +581,33 @@ namespace ST.Library.UI.STTextBox
             fi.IndexOfLine = nIndexLine;
 
             int targetX = pt.X - base.TextRectangle.X - subLine.X;
+            if (subLine.Offsets == null) {
+                float mono = c.ITextBoxRender.CharWidthFloat > 0f ? c.ITextBoxRender.CharWidthFloat : (float)c.ITextBoxRender.GetSpaceWidth();
+                int monoCol = 0;
+                if (mono > 0f) {
+                    monoCol = (int)Math.Round(targetX / mono);
+                }
+                if (monoCol < 0) monoCol = 0;
+                if (monoCol > subLine.Length) monoCol = subLine.Length;
+                if (monoCol > 0 && subLine.Index + monoCol <= line.RawString.Length) {
+                    if (subLine.Index + monoCol == line.RawString.Length && (line.RawString[line.RawString.Length - 1] == '\n' || line.RawString[line.RawString.Length - 1] == '\r')) {
+                        if (monoCol == subLine.Length && (line.RawString[subLine.Index + monoCol - 1] == '\r' || line.RawString[subLine.Index + monoCol - 1] == '\n')) {
+                            monoCol--;
+                            if (monoCol > 0 && line.RawString[subLine.Index + monoCol - 1] == '\r') {
+                                monoCol--;
+                            }
+                        }
+                    }
+                }
+                int offX = (int)Math.Round(monoCol * mono);
+                fi.IndexOfCharInLine = subLine.Index + monoCol;
+                fi.Location = new Point(base.TextRectangle.X + subLine.X + offX, base.TextRectangle.Y + nYOffset * c.LineHeight);
+                fi.Find = true;
+                return fi;
+            }
+
             int[] offsets = subLine.Offsets;
-            if (offsets == null || offsets.Length <= 1) {
+            if (offsets.Length <= 1) {
                 fi.IndexOfCharInLine = subLine.Index;
                 fi.Location = new Point(base.TextRectangle.X + subLine.X, base.TextRectangle.Y + nYOffset * c.LineHeight);
                 fi.Find = true;
@@ -564,7 +690,7 @@ namespace ST.Library.UI.STTextBox
             }
             var subLine = tag.SubLines[nSubIndex];
             int relChar = Math.Max(0, Math.Min(subLine.Length, nIndex - subLine.Index));
-            int charX = (subLine.Offsets != null && relChar < subLine.Offsets.Length) ? subLine.Offsets[relChar] : subLine.Width;
+            int charX = GetSubLineOffset(subLine, relChar);
 
             return new FindInfo() {
                 Find = true,
@@ -606,7 +732,7 @@ namespace ST.Library.UI.STTextBox
 
                 if (subLen > 0) {
                     int drawX = nX + subLine.X;
-                    int subWidth = (subLine.Offsets != null && subLen < subLine.Offsets.Length) ? subLine.Offsets[subLen] : subLine.Width;
+                    int subWidth = GetSubLineOffset(subLine, subLen);
 
                     bool hasSelection = !isSelectionEmpty && !(subStartChar >= selEnd || (subStartChar + subLen) <= selStart);
 
@@ -623,7 +749,7 @@ namespace ST.Library.UI.STTextBox
                             if (ch == '\t') {
                                 if (hasRun && j > runStart) {
                                     string runStr = raw.Substring(subLine.Index + runStart, j - runStart);
-                                    int runW = subLine.Offsets[j] - subLine.Offsets[runStart];
+                                    int runW = GetSubLineOffset(subLine, j) - GetSubLineOffset(subLine, runStart);
                                     TextStyle drawStyle = syntaxRunStyle;
                                     if (isSelectionPass) {
                                         drawStyle.ForeColor = selTextColor;
@@ -640,7 +766,7 @@ namespace ST.Library.UI.STTextBox
                             if (c.TryGetEmoji(raw, subLine.Index + j, subLine.Index + subLen, out emojiLen, out emojiStr)) {
                                 if (hasRun && j > runStart) {
                                     string runStr = raw.Substring(subLine.Index + runStart, j - runStart);
-                                    int runW = subLine.Offsets[j] - subLine.Offsets[runStart];
+                                    int runW = GetSubLineOffset(subLine, j) - GetSubLineOffset(subLine, runStart);
                                     TextStyle drawStyle = syntaxRunStyle;
                                     if (isSelectionPass) {
                                         drawStyle.ForeColor = selTextColor;
@@ -650,7 +776,7 @@ namespace ST.Library.UI.STTextBox
                                     hasRun = false;
                                 }
                                 if (c.IEmojiRender != null) {
-                                    int emojiX = drawX + (subLine.Offsets != null ? subLine.Offsets[j] : 0);
+                                    int emojiX = drawX + GetSubLineOffset(subLine, j);
                                     c.IEmojiRender.DrawEmoji(render, emojiStr, emojiX + (nCharSpacing >> 1), nY + nLineSpacing, c.FontHeight, isSelectionPass);
                                 }
                                 j += emojiLen - 1;
@@ -662,12 +788,12 @@ namespace ST.Library.UI.STTextBox
 
                             if (!hasRun) {
                                 runStart = j;
-                                runStartX = drawX + (subLine.Offsets != null ? subLine.Offsets[j] : 0);
+                                runStartX = drawX + GetSubLineOffset(subLine, j);
                                 syntaxRunStyle = syntaxStyle;
                                 hasRun = true;
                             } else if (syntaxStyle.ForeColor != syntaxRunStyle.ForeColor || syntaxStyle.BackColor != syntaxRunStyle.BackColor || syntaxStyle.FontStyle != syntaxRunStyle.FontStyle) {
                                 string runStr = raw.Substring(subLine.Index + runStart, j - runStart);
-                                int runW = subLine.Offsets[j] - subLine.Offsets[runStart];
+                                int runW = GetSubLineOffset(subLine, j) - GetSubLineOffset(subLine, runStart);
                                 TextStyle drawStyle = syntaxRunStyle;
                                 if (isSelectionPass) {
                                     drawStyle.ForeColor = selTextColor;
@@ -675,14 +801,14 @@ namespace ST.Library.UI.STTextBox
                                 }
                                 render.DrawString(runStr, drawStyle, new Rectangle(runStartX, nY, runW, c.LineHeight));
                                 runStart = j;
-                                runStartX = drawX + (subLine.Offsets != null ? subLine.Offsets[j] : 0);
+                                runStartX = drawX + GetSubLineOffset(subLine, j);
                                 syntaxRunStyle = syntaxStyle;
                             }
                         }
 
                         if (hasRun && subLen > runStart) {
                             string runStr = raw.Substring(subLine.Index + runStart, subLen - runStart);
-                            int runW = subLine.Offsets[subLen] - subLine.Offsets[runStart];
+                            int runW = GetSubLineOffset(subLine, subLen) - GetSubLineOffset(subLine, runStart);
                             TextStyle drawStyle = syntaxRunStyle;
                             if (isSelectionPass) {
                                 drawStyle.ForeColor = selTextColor;
@@ -699,9 +825,9 @@ namespace ST.Library.UI.STTextBox
                     if (hasSelection && selTextColor != Color.Empty) {
                         int relSelStart = Math.Max(0, selStart - subStartChar);
                         int relSelEnd = Math.Min(subLen, selEnd - subStartChar);
-                        if (relSelEnd > relSelStart && subLine.Offsets != null) {
-                            int selLeftX = drawX + subLine.Offsets[relSelStart];
-                            int selRightX = drawX + subLine.Offsets[relSelEnd];
+                        if (relSelEnd > relSelStart) {
+                            int selLeftX = drawX + GetSubLineOffset(subLine, relSelStart);
+                            int selRightX = drawX + GetSubLineOffset(subLine, relSelEnd);
                             int selW = selRightX - selLeftX;
                             if (selW > 0) {
                                 Rectangle selClip = new Rectangle(selLeftX, nY, selW, c.LineHeight + 1);
@@ -843,7 +969,7 @@ namespace ST.Library.UI.STTextBox
             }
             var subLine = tag.SubLines[nSubLineIndex];
             int relChar = Math.Max(0, Math.Min(subLine.Length, nIndexInLine - subLine.Index));
-            int charX = (subLine.Offsets != null && relChar < subLine.Offsets.Length) ? subLine.Offsets[relChar] : subLine.Width;
+            int charX = GetSubLineOffset(subLine, relChar);
 
             c.Caret.Line = line;
             c.Caret.IndexOfLine = nLineIndex;
@@ -874,8 +1000,8 @@ namespace ST.Library.UI.STTextBox
                 int relStart = Math.Max(0, selection.StartIndex - subStartChar);
                 int relEnd = Math.Min(subLine.Length, selection.EndIndex - subStartChar);
 
-                int startX = (subLine.Offsets != null && relStart < subLine.Offsets.Length) ? subLine.Offsets[relStart] : 0;
-                int endX = (subLine.Offsets != null && relEnd < subLine.Offsets.Length) ? subLine.Offsets[relEnd] : subLine.Width;
+                int startX = GetSubLineOffset(subLine, relStart);
+                int endX = GetSubLineOffset(subLine, relEnd);
 
                 int nLeft = base.TextRectangle.X + subLine.X + startX;
                 int nWidth = endX - startX;

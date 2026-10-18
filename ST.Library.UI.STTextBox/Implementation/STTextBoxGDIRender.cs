@@ -136,6 +136,9 @@ namespace ST.Library.UI.STTextBox
 
             Font ft = GetFontFromFlag(flag);
             int width = MeasureStringWidth(strText, ft);
+            if (m_dic_width_cache.Count >= 1024) {
+                m_dic_width_cache.Clear();
+            }
             m_dic_width_cache[key] = width;
             return width;
         }

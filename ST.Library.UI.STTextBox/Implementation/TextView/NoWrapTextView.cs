@@ -12,8 +12,10 @@ namespace ST.Library.UI.STTextBox
     public class NoWrapTextView : TextView
     {
         private const int LINE_OVERLAP_MARGIN = 1;
+        private const int MAX_OFFSETS_CACHE = 512;
         private int m_nMaxLineWidth;
         private readonly Dictionary<TextLine, int[]> m_dic_line_offsets = new Dictionary<TextLine, int[]>();
+        private readonly Queue<TextLine> m_offsets_lru = new Queue<TextLine>();
         private readonly Dictionary<char, float> m_dic_char_widths = new Dictionary<char, float>();
 
         private readonly StringFormat m_sf = new StringFormat(StringFormat.GenericTypographic) {
@@ -24,11 +26,13 @@ namespace ST.Library.UI.STTextBox
         public override void Init(STTextBox.Core core) {
             base.Init(core);
             m_dic_line_offsets.Clear();
+            m_offsets_lru.Clear();
             m_dic_char_widths.Clear();
             m_nMaxLineWidth = 0;
             if (core != null && core.TextBox != null) {
                 core.TextBox.FontChanged += (s, e) => {
                     m_dic_line_offsets.Clear();
+                    m_offsets_lru.Clear();
                     m_dic_char_widths.Clear();
                     m_nMaxLineWidth = 0;
                 };
@@ -37,6 +41,7 @@ namespace ST.Library.UI.STTextBox
 
         public override void OnInitAllText() {
             m_dic_line_offsets.Clear();
+            m_offsets_lru.Clear();
             m_dic_char_widths.Clear();
             m_nMaxLineWidth = 0;
             var c = base.Core;
@@ -67,6 +72,36 @@ namespace ST.Library.UI.STTextBox
         public override int GetCurrentCharOffset() {
             var c = base.Core;
             return c.Caret.X - base.TextRectangle.X + c.Scroll.XOffset;
+        }
+
+        private bool CanUseFastMono(out float monoAdvance) {
+            var c = base.Core;
+            monoAdvance = 0f;
+            if (c == null) return false;
+            if (!c.ITextBoxRender.IsMonospaced) return false;
+            if (c.TextBox.CharSpacing != 0) return false;
+            monoAdvance = c.ITextBoxRender.CharWidthFloat > 0f ? c.ITextBoxRender.CharWidthFloat : (float)c.ITextBoxRender.GetSpaceWidth();
+            return monoAdvance > 0f;
+        }
+
+        private static bool IsPureAsciiNoTabs(string text) {
+            if (string.IsNullOrEmpty(text)) return true;
+            for (int i = 0; i < text.Length; i++) {
+                char ch = text[i];
+                if (ch < 32 || ch > 126) {
+                    if (ch != '\r' && ch != '\n') return false;
+                }
+            }
+            return true;
+        }
+
+        private static int GetLineDrawLength(string raw) {
+            if (string.IsNullOrEmpty(raw)) return 0;
+            int len = raw.Length;
+            while (len > 0 && (raw[len - 1] == '\r' || raw[len - 1] == '\n')) {
+                len--;
+            }
+            return len;
         }
 
         private int[] GetOrCreateLineOffsets(TextLine line) {
@@ -146,7 +181,13 @@ namespace ST.Library.UI.STTextBox
             if (finalWidth > m_nMaxLineWidth) {
                 m_nMaxLineWidth = finalWidth;
             }
+
+            if (m_dic_line_offsets.Count >= MAX_OFFSETS_CACHE && m_offsets_lru.Count > 0) {
+                TextLine oldLine = m_offsets_lru.Dequeue();
+                m_dic_line_offsets.Remove(oldLine);
+            }
             m_dic_line_offsets[line] = offsets;
+            m_offsets_lru.Enqueue(line);
             return offsets;
         }
 
@@ -161,24 +202,42 @@ namespace ST.Library.UI.STTextBox
             TextLine line = c.TextManager[nIndexLine];
             if (line == null) return new FindInfo();
 
-            int[] offsets = GetOrCreateLineOffsets(line);
-            int targetOffset = pt.X - base.TextRectangle.Left + c.Scroll.XOffset;
+            if (CanUseFastMono(out float monoAdvance) && IsPureAsciiNoTabs(line.RawString)) {
+                string raw = line.RawString ?? string.Empty;
+                int drawLength = GetLineDrawLength(raw);
+                int targetOffset = pt.X - base.TextRectangle.Left + c.Scroll.XOffset;
+                int col = (int)Math.Round(targetOffset / monoAdvance);
+                if (col < 0) col = 0;
+                if (col > drawLength) col = drawLength;
+                int x = base.TextRectangle.Left - c.Scroll.XOffset + (int)Math.Round(col * monoAdvance);
+                int y = base.TextRectangle.Y + (nIndexLine - c.Scroll.YValue) * c.LineHeight;
+                return new FindInfo() {
+                    Line = line,
+                    IndexOfLine = nIndexLine,
+                    IndexOfCharInLine = col,
+                    Location = new Point(x, y),
+                    Find = true
+                };
+            }
 
-            int col = 0;
+            int[] offsets = GetOrCreateLineOffsets(line);
+            int targetOffsetComplex = pt.X - base.TextRectangle.Left + c.Scroll.XOffset;
+
+            int colComplex = 0;
             int low = 0, high = offsets.Length - 1;
             while (low <= high) {
                 int mid = (low + high) >> 1;
-                if (offsets[mid] <= targetOffset) {
-                    col = mid;
+                if (offsets[mid] <= targetOffsetComplex) {
+                    colComplex = mid;
                     low = mid + 1;
                 } else {
                     high = mid - 1;
                 }
             }
-            if (col < offsets.Length - 1) {
-                int charWidth = offsets[col + 1] - offsets[col];
-                if (charWidth > 0 && targetOffset - offsets[col] >= charWidth / 2) {
-                    col++;
+            if (colComplex < offsets.Length - 1) {
+                int charWidth = offsets[colComplex + 1] - offsets[colComplex];
+                if (charWidth > 0 && targetOffsetComplex - offsets[colComplex] >= charWidth / 2) {
+                    colComplex++;
                 }
             }
 
@@ -188,18 +247,18 @@ namespace ST.Library.UI.STTextBox
             while (textLen > 0 && (text[textLen - 1] == '\r' || text[textLen - 1] == '\n')) {
                 textLen--;
             }
-            if (col > textLen) {
-                col = textLen;
+            if (colComplex > textLen) {
+                colComplex = textLen;
             }
 
-            int x = base.TextRectangle.Left - c.Scroll.XOffset + offsets[col];
-            int y = base.TextRectangle.Y + (nIndexLine - c.Scroll.YValue) * c.LineHeight;
+            int xComplex = base.TextRectangle.Left - c.Scroll.XOffset + offsets[colComplex];
+            int yComplex = base.TextRectangle.Y + (nIndexLine - c.Scroll.YValue) * c.LineHeight;
 
             return new FindInfo() {
                 Line = line,
                 IndexOfLine = nIndexLine,
-                IndexOfCharInLine = col,
-                Location = new Point(x, y),
+                IndexOfCharInLine = colComplex,
+                Location = new Point(xComplex, yComplex),
                 Find = true
             };
         }
@@ -210,15 +269,31 @@ namespace ST.Library.UI.STTextBox
             int nIndexOfLine = c.TextManager.GetLineIndexFromCharIndex(nIndex);
             TextLine line = c.TextManager[nIndexOfLine];
             if (line == null) return new FindInfo();
+
+            if (CanUseFastMono(out float monoAdvance) && IsPureAsciiNoTabs(line.RawString)) {
+                string raw = line.RawString ?? string.Empty;
+                int drawLength = GetLineDrawLength(raw);
+                int col = Math.Max(0, Math.Min(nIndex - line.IndexOfFirstChar, drawLength));
+                int x = base.TextRectangle.Left - c.Scroll.XOffset + (int)Math.Round(col * monoAdvance);
+                int y = base.TextRectangle.Y + (nIndexOfLine - c.Scroll.YValue) * c.LineHeight;
+                return new FindInfo() {
+                    Line = line,
+                    IndexOfLine = nIndexOfLine,
+                    IndexOfCharInLine = col,
+                    Location = new Point(x, y),
+                    Find = true
+                };
+            }
+
             int[] offsets = GetOrCreateLineOffsets(line);
-            int col = Math.Max(0, Math.Min(nIndex - line.IndexOfFirstChar, offsets.Length - 1));
-            int x = base.TextRectangle.Left - c.Scroll.XOffset + offsets[col];
-            int y = base.TextRectangle.Y + (nIndexOfLine - c.Scroll.YValue) * c.LineHeight;
+            int colComplex = Math.Max(0, Math.Min(nIndex - line.IndexOfFirstChar, offsets.Length - 1));
+            int xComplex = base.TextRectangle.Left - c.Scroll.XOffset + offsets[colComplex];
+            int yComplex = base.TextRectangle.Y + (nIndexOfLine - c.Scroll.YValue) * c.LineHeight;
             return new FindInfo() {
                 Line = line,
                 IndexOfLine = nIndexOfLine,
-                IndexOfCharInLine = col,
-                Location = new Point(x, y),
+                IndexOfCharInLine = colComplex,
+                Location = new Point(xComplex, yComplex),
                 Find = true
             };
         }
@@ -242,14 +317,25 @@ namespace ST.Library.UI.STTextBox
             int selEndCol = Math.Min(lineLen, selection.EndIndex - lineStart);
             if (selEndCol <= selStartCol) return;
 
-            int[] offsets = GetOrCreateLineOffsets(line);
-            int selStartX = base.TextRectangle.Left - c.Scroll.XOffset + offsets[selStartCol];
-            int selEndX = base.TextRectangle.Left - c.Scroll.XOffset + offsets[selEndCol];
-            int selWidth = selEndX - selStartX;
-            if (selWidth <= 0) return;
+            if (CanUseFastMono(out float monoAdvance) && IsPureAsciiNoTabs(line.RawString)) {
+                int selStartX = base.TextRectangle.Left - c.Scroll.XOffset + (int)Math.Round(selStartCol * monoAdvance);
+                int selEndX = base.TextRectangle.Left - c.Scroll.XOffset + (int)Math.Round(selEndCol * monoAdvance);
+                int selWidth = selEndX - selStartX;
+                if (selWidth <= 0) return;
 
-            Color selColor = c.TextBox.SelectionColor.A == 0 ? Color.FromArgb(0, 120, 215) : c.TextBox.SelectionColor;
-            render.FillRectangle(selColor, selStartX, nY, selWidth, c.LineHeight + LINE_OVERLAP_MARGIN);
+                Color selColor = c.TextBox.SelectionColor.A == 0 ? Color.FromArgb(0, 120, 215) : c.TextBox.SelectionColor;
+                render.FillRectangle(selColor, selStartX, nY, selWidth, c.LineHeight + LINE_OVERLAP_MARGIN);
+                return;
+            }
+
+            int[] offsets = GetOrCreateLineOffsets(line);
+            int selStartXComplex = base.TextRectangle.Left - c.Scroll.XOffset + offsets[selStartCol];
+            int selEndXComplex = base.TextRectangle.Left - c.Scroll.XOffset + offsets[selEndCol];
+            int selWidthComplex = selEndXComplex - selStartXComplex;
+            if (selWidthComplex <= 0) return;
+
+            Color selColorComplex = c.TextBox.SelectionColor.A == 0 ? Color.FromArgb(0, 120, 215) : c.TextBox.SelectionColor;
+            render.FillRectangle(selColorComplex, selStartXComplex, nY, selWidthComplex, c.LineHeight + LINE_OVERLAP_MARGIN);
         }
 
         protected override int OnDrawLine(ISTTextBoxRender render, TextLine line, int nX, int nY) {
@@ -257,11 +343,7 @@ namespace ST.Library.UI.STTextBox
             string raw = line.RawString;
             if (string.IsNullOrEmpty(raw)) return c.LineHeight;
 
-            int[] offsets = GetOrCreateLineOffsets(line);
-            int drawLength = raw.Length;
-            while (drawLength > 0 && (raw[drawLength - 1] == '\r' || raw[drawLength - 1] == '\n')) {
-                drawLength--;
-            }
+            int drawLength = GetLineDrawLength(raw);
             if (drawLength == 0) return c.LineHeight;
 
             int baseX = nX - c.Scroll.XOffset;
@@ -272,6 +354,82 @@ namespace ST.Library.UI.STTextBox
             Color selTextColor = (c.TextBox.SelectedTextColor != Color.Empty) ? c.TextBox.SelectedTextColor : Color.White;
             int nLineSpacing = c.TextBox.GetIntYSize(c.TextBox.LineSpacing) / 2;
             int nCharSpacing = c.TextBox.GetIntXSize(c.TextBox.CharSpacing);
+
+            if (CanUseFastMono(out float monoAdvance) && IsPureAsciiNoTabs(raw)) {
+                int finalWidth = (int)Math.Round(drawLength * monoAdvance);
+                line.Tag = finalWidth;
+                if (finalWidth > m_nMaxLineWidth) m_nMaxLineWidth = finalWidth;
+
+                void DrawRunsFast(bool isSelectionPass) {
+                    int runStart = 0;
+                    TextStyle syntaxRunStyle = TextStyle.Empty;
+                    bool hasRun = false;
+
+                    for (int i = 0; i < drawLength; i++) {
+                        int charIdx = lineStart + i;
+                        var syntaxStyle = c.GetStyleFromCharIndex(charIdx);
+                        if (syntaxStyle.ForeColor.A == 0) syntaxStyle.ForeColor = c.TextBox.ForeColor;
+
+                        if (!hasRun) {
+                            runStart = i;
+                            syntaxRunStyle = syntaxStyle;
+                            hasRun = true;
+                        } else if (syntaxRunStyle.ForeColor != syntaxStyle.ForeColor || syntaxRunStyle.BackColor != syntaxStyle.BackColor || syntaxRunStyle.FontStyle != syntaxStyle.FontStyle) {
+                            int runLen = i - runStart;
+                            if (runLen > 0) {
+                                string runStr = raw.Substring(runStart, runLen);
+                                int rStartX = baseX + (int)Math.Round(runStart * monoAdvance);
+                                int rEndX = baseX + (int)Math.Round(i * monoAdvance);
+                                TextStyle drawStyle = syntaxRunStyle;
+                                if (isSelectionPass) {
+                                    drawStyle.ForeColor = selTextColor;
+                                    drawStyle.BackColor = Color.Transparent;
+                                }
+                                render.DrawString(runStr, drawStyle, new Rectangle(rStartX, nY, rEndX - rStartX, c.LineHeight));
+                            }
+                            runStart = i;
+                            syntaxRunStyle = syntaxStyle;
+                        }
+                    }
+
+                    if (hasRun && drawLength > runStart) {
+                        int runLen = drawLength - runStart;
+                        string runStr = raw.Substring(runStart, runLen);
+                        int rStartX = baseX + (int)Math.Round(runStart * monoAdvance);
+                        int rEndX = baseX + (int)Math.Round(drawLength * monoAdvance);
+                        TextStyle drawStyle = syntaxRunStyle;
+                        if (isSelectionPass) {
+                            drawStyle.ForeColor = selTextColor;
+                            drawStyle.BackColor = Color.Transparent;
+                        }
+                        render.DrawString(runStr, drawStyle, new Rectangle(rStartX, nY, rEndX - rStartX, c.LineHeight));
+                    }
+                }
+
+                DrawRunsFast(false);
+
+                if (hasSelection && selTextColor != Color.Empty) {
+                    int selStartCol = Math.Max(0, Math.Min(drawLength, selStart - lineStart));
+                    int selEndCol = Math.Max(0, Math.Min(drawLength, selEnd - lineStart));
+                    if (selEndCol > selStartCol) {
+                        int selStartX = baseX + (int)Math.Round(selStartCol * monoAdvance);
+                        int selEndX = baseX + (int)Math.Round(selEndCol * monoAdvance);
+                        int selWidth = selEndX - selStartX;
+                        if (selWidth > 0) {
+                            Rectangle selClip = new Rectangle(selStartX, nY, selWidth, c.LineHeight + LINE_OVERLAP_MARGIN);
+                            selClip.Intersect(base.TextRectangle);
+                            if (selClip.Width > 0 && selClip.Height > 0) {
+                                render.SetClip(selClip);
+                                DrawRunsFast(true);
+                                render.SetClip(base.TextRectangle);
+                            }
+                        }
+                    }
+                }
+                return c.LineHeight;
+            }
+
+            int[] offsets = GetOrCreateLineOffsets(line);
 
             void DrawRuns(bool isSelectionPass) {
                 int runStart = 0;

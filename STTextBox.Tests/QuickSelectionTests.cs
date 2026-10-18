@@ -1155,6 +1155,103 @@ this.Controls.Add(tbx);";
             }
         }
 
+        [Fact]
+        public void MemoryOptimization_ZeroAllocationOffsets_And_LowFootprintEmojiTest()
+        {
+            string emojiPkg = @"demos_bin\svg_mix_twe";
+            if (!System.IO.File.Exists(emojiPkg))
+            {
+                emojiPkg = @"..\..\..\..\demos_bin\svg_mix_twe";
+            }
+
+            if (System.IO.File.Exists(emojiPkg))
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+                long memBefore = GC.GetTotalMemory(true);
+
+                using (var emoji = new ST.Library.Drawing.EmojiRender(emojiPkg))
+                {
+                    long memAfter = GC.GetTotalMemory(true);
+                    long deltaBytes = memAfter - memBefore;
+                    // Previously EmojiRender used 16+ MB. With lazy streaming it should be under 1.5 MB.
+                    Assert.True(deltaBytes < 1500 * 1024, $"EmojiRender used too much memory: {deltaBytes / 1024} KB");
+
+                    // Renders cleanly
+                    using (var img = emoji.GetEmojiImage("😀", 24))
+                    {
+                        Assert.NotNull(img);
+                        Assert.Equal(24, img.Width);
+                    }
+                }
+            }
+
+            // Test NoWrap zero-allocation offsets on 1,000 ASCII lines
+            using (var tbx = new ST.Library.UI.STTextBox.STTextBox())
+            {
+                tbx.Font = new Font("Consolas", 10);
+                var sb = new System.Text.StringBuilder();
+                for (int i = 0; i < 1000; i++)
+                {
+                    sb.AppendLine($"Line {i}: ABCDEFGHIJKLMNOPQRSTUVWXYZ 1234567890");
+                }
+                tbx.SetText(sb.ToString());
+
+                // Access all 1,000 lines
+                for (int i = 0; i < 1000; i++)
+                {
+                    tbx.Select(i * 40, 0);
+                }
+
+                var fCore = typeof(ST.Library.UI.STTextBox.STTextBox).GetField("m_core", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                var core = fCore.GetValue(tbx);
+                var pTv = core.GetType().GetProperty("ITextView");
+                var tv = pTv.GetValue(core, null);
+                var fOffsets = tv.GetType().GetField("m_dic_line_offsets", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                var dict = (System.Collections.IDictionary)fOffsets.GetValue(tv);
+
+                // Zero cached lines allocated for pure monospaced ASCII lines
+                Assert.Empty(dict);
+            }
+
+            // Test WrapTextView null offsets on 1,000 ASCII lines
+            using (var tbx = new ST.Library.UI.STTextBox.STTextBox())
+            {
+                tbx.Font = new Font("Consolas", 10);
+                tbx.SetBounds(0, 0, 400, 300);
+                var wrapView = new ST.Library.UI.STTextBox.WrapTextView();
+                tbx.SetTextView(wrapView);
+                var sb = new System.Text.StringBuilder();
+                for (int i = 0; i < 500; i++)
+                {
+                    sb.AppendLine($"Line {i}: The quick brown fox jumps over the lazy dog repeatedly.");
+                }
+                tbx.SetText(sb.ToString());
+
+                var fCore = typeof(ST.Library.UI.STTextBox.STTextBox).GetField("m_core", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                var core = fCore.GetValue(tbx);
+                var pTm = core.GetType().GetProperty("TextManager");
+                var tm = (ST.Library.UI.STTextBox.TextManager)pTm.GetValue(core, null);
+
+                // Check that SubLineInfo.Offsets is null for monospaced ASCII lines
+                for (int i = 0; i < 100; i++)
+                {
+                    var line = tm[i];
+                    var tag = line.Tag;
+                    Assert.NotNull(tag);
+                    var pSubLines = tag.GetType().GetProperty("SubLines");
+                    var subLines = (System.Collections.IList)pSubLines.GetValue(tag, null);
+                    Assert.NotNull(subLines);
+                    foreach (var sub in subLines)
+                    {
+                        var fOffsets = sub.GetType().GetField("Offsets");
+                        var offs = (int[])fOffsets.GetValue(sub);
+                        Assert.Null(offs); // Zero array allocations
+                    }
+                }
+            }
+        }
     }
 }
 
