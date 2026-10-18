@@ -14,7 +14,7 @@ namespace ST.Library.UI.STTextBox
         private const int LINE_OVERLAP_MARGIN = 1;
         private int m_nMaxLineWidth;
         private readonly Dictionary<TextLine, int[]> m_dic_line_offsets = new Dictionary<TextLine, int[]>();
-        private readonly Dictionary<char, int> m_dic_char_widths = new Dictionary<char, int>();
+        private readonly Dictionary<char, float> m_dic_char_widths = new Dictionary<char, float>();
 
         private readonly StringFormat m_sf = new StringFormat(StringFormat.GenericTypographic) {
             Alignment = StringAlignment.Far,
@@ -79,11 +79,11 @@ namespace ST.Library.UI.STTextBox
             offsets[0] = 0;
 
             bool isMono = c.ITextBoxRender.IsMonospaced;
-            int monoAdvance = c.ITextBoxRender.GetSpaceWidth();
-            int charSpacing = c.TextBox.GetIntXSize(c.TextBox.CharSpacing);
+            float monoAdvance = c.ITextBoxRender.CharWidthFloat > 0f ? c.ITextBoxRender.CharWidthFloat : (float)c.ITextBoxRender.GetSpaceWidth();
+            float charSpacing = (float)c.TextBox.GetIntXSize(c.TextBox.CharSpacing);
 
             // Fast ASCII check: if all characters are regular ASCII, we can use fast mono advance
-            bool isPureAsciiNoTabs = isMono && (charSpacing == 0) && monoAdvance > 0;
+            bool isPureAsciiNoTabs = isMono && (charSpacing == 0f) && monoAdvance > 0f;
             if (isPureAsciiNoTabs) {
                 for (int i = 0; i < text.Length; i++) {
                     char ch = text[i];
@@ -96,53 +96,55 @@ namespace ST.Library.UI.STTextBox
                 }
             }
 
-            int cur = 0;
+            float curF = 0f;
             if (isPureAsciiNoTabs) {
                 for (int i = 0; i < text.Length; i++) {
                     char ch = text[i];
                     if (ch == '\r' || ch == '\n') {
-                        offsets[i + 1] = cur;
+                        offsets[i + 1] = (int)Math.Round(curF);
                     } else {
-                        cur += monoAdvance;
-                        offsets[i + 1] = cur;
+                        curF += monoAdvance;
+                        offsets[i + 1] = (int)Math.Round(curF);
                     }
                 }
             } else {
                 c.IGraphemeSplitter.Each(text, (str, nStart, nLen) => {
                     string strChar = str.Substring(nStart, nLen);
-                    int w;
+                    float w;
                     if (c.IsEmoji(strChar)) {
-                        w = c.FontHeight;
+                        w = (float)c.FontHeight;
                     } else if (nLen == 1 && strChar[0] == '\t') {
-                        w = c.GetStringWidth("\t", TextStyle.Empty, cur);
+                        w = c.GetStringWidthFloat("\t", TextStyle.Empty, curF);
                     } else if (nLen == 1 && (strChar[0] == '\r' || strChar[0] == '\n')) {
-                        w = 0;
-                    } else if (nLen == 1 && isMono && charSpacing == 0 && strChar[0] >= 32 && strChar[0] <= 126) {
+                        w = 0f;
+                    } else if (nLen == 1 && isMono && charSpacing == 0f && strChar[0] >= 32 && strChar[0] <= 126) {
                         w = monoAdvance;
                     } else {
                         if (nLen > 1 && strChar[nLen - 1] >= '\uFE00' && strChar[nLen - 1] <= '\uFE0F') {
                             strChar = str.Substring(nStart, nLen - 1);
                         }
-                        if (nLen == 1 && m_dic_char_widths.TryGetValue(strChar[0], out int cachedW)) {
+                        if (nLen == 1 && m_dic_char_widths.TryGetValue(strChar[0], out float cachedW)) {
                             w = cachedW + charSpacing;
                         } else {
-                            w = c.GetStringWidth(strChar, c.GetStyleFromCharIndex(line.IndexOfFirstChar + nStart), cur) + charSpacing;
+                            w = c.GetStringWidthFloat(strChar, c.GetStyleFromCharIndex(line.IndexOfFirstChar + nStart), curF) + charSpacing;
                             if (nLen == 1) {
                                 m_dic_char_widths[strChar[0]] = w - charSpacing;
                             }
                         }
                     }
-                    cur += w;
+                    curF += w;
+                    int off = (int)Math.Round(curF);
                     for (int k = 1; k <= nLen; k++) {
-                        offsets[nStart + k] = cur;
+                        offsets[nStart + k] = off;
                     }
                     return true;
                 });
             }
 
-            line.Tag = cur;
-            if (cur > m_nMaxLineWidth) {
-                m_nMaxLineWidth = cur;
+            int finalWidth = (int)Math.Round(curF);
+            line.Tag = finalWidth;
+            if (finalWidth > m_nMaxLineWidth) {
+                m_nMaxLineWidth = finalWidth;
             }
             m_dic_line_offsets[line] = offsets;
             return offsets;
@@ -178,6 +180,16 @@ namespace ST.Library.UI.STTextBox
                 if (charWidth > 0 && targetOffset - offsets[col] >= charWidth / 2) {
                     col++;
                 }
+            }
+
+            // Do not position caret on or past trailing newlines of the line
+            string text = line.RawString ?? string.Empty;
+            int textLen = text.Length;
+            while (textLen > 0 && (text[textLen - 1] == '\r' || text[textLen - 1] == '\n')) {
+                textLen--;
+            }
+            if (col > textLen) {
+                col = textLen;
             }
 
             int x = base.TextRectangle.Left - c.Scroll.XOffset + offsets[col];
@@ -261,7 +273,7 @@ namespace ST.Library.UI.STTextBox
             int nLineSpacing = c.TextBox.GetIntYSize(c.TextBox.LineSpacing) / 2;
             int nCharSpacing = c.TextBox.GetIntXSize(c.TextBox.CharSpacing);
 
-            // Fast path: if line has no emojis and no tabs:
+            // Fast path: if line has no emojis, no tabs, and no style monitors:
             // Dual-pass clip rendering for silky-smooth, jitter-free selection!
             bool hasSpecialChars = false;
             for (int i = 0; i < drawLength; i++) {
@@ -272,7 +284,8 @@ namespace ST.Library.UI.STTextBox
                 }
             }
 
-            if (!hasSpecialChars) {
+            bool hasStyleMonitors = c.ITextStyleMonitors != null && c.ITextStyleMonitors.Length > 0;
+            if (!hasSpecialChars && !hasStyleMonitors) {
                 // Pass 1: Draw full line unselected
                 string fullText = raw.Substring(0, drawLength);
                 TextStyle style = c.GetStyleFromCharIndex(lineStart);

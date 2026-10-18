@@ -67,7 +67,8 @@ namespace ST.Library.UI.STTextBox
             int lineHeight = c.LineHeight;
             Point ptTop = c.ITextView.ViewToControl(new Point(0, minLine * lineHeight));
             int startY = ptTop.Y - 2;
-            int height = ((maxLine - minLine + 1) * lineHeight) + 4;
+            int spacing = c.TextBox.GetIntYSize(c.TextBox.LineSpacing);
+            int height = ((maxLine - minLine + 1) * lineHeight) + spacing + 4;
             startY = Math.Max(c.ViewRectangle.Top, startY);
             height = Math.Min(height, c.ViewRectangle.Bottom - startY);
             if (height <= 0) {

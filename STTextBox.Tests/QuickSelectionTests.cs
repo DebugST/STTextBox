@@ -882,5 +882,81 @@ namespace STTextBox.Tests
                 }
             }
         }
+
+        [Fact]
+        public void SingleTextView_GdipRender_CharacterOffsetsAlignWithSubPixelAccuracy()
+        {
+            using (var tbx = new ST.Library.UI.STTextBox.STTextBox())
+            using (var gdipRender = new STTextBoxGDIPRender())
+            {
+                tbx.SetBounds(0, 0, 500, 30);
+                tbx.SetTextBoxRender(gdipRender);
+                var singleView = new SingleTextView();
+                tbx.SetTextView(singleView);
+                tbx.Font = new Font("Consolas", 10f);
+
+                string text = "this is a single text box";
+                tbx.SetText(text);
+
+                // Verify ViewToControl matches TextRectangle.Y
+                Point viewPt = new Point(0, 0);
+                Point ctrlPt = singleView.ViewToControl(viewPt);
+                Assert.Equal(singleView.TextRectangle.Y, ctrlPt.Y);
+                Assert.True(singleView.TextRectangle.Y > 0, "SingleTextView should be vertically centered");
+
+                // Verify character boundary offsets match GDI+ actual visual measurement
+                using (var bmp = new Bitmap(1, 1))
+                using (var g = Graphics.FromImage(bmp))
+                {
+                    var sf = new StringFormat(StringFormat.GenericTypographic);
+                    sf.FormatFlags |= StringFormatFlags.MeasureTrailingSpaces | StringFormatFlags.NoWrap;
+
+                    for (int i = 0; i <= text.Length; i++)
+                    {
+                        var fi = singleView.FindFromCharIndex(i);
+                        int charX = fi.Location.X - singleView.TextRectangle.X;
+
+                        float actualW = i == 0 ? 0f : g.MeasureString(text.Substring(0, i), tbx.Font, 10000, sf).Width;
+                        int expectedX = (int)Math.Round(actualW);
+
+                        // Deviation must be <= 1px (sub-pixel accurate)
+                        int diff = Math.Abs(charX - expectedX);
+                        Assert.True(diff <= 1, $"Offset mismatch at char {i}: charX={charX}, expected={expectedX}, diff={diff}");
+                    }
+                }
+
+                // Specifically verify character 10 ('s' of "single")
+                var fiS = singleView.FindFromCharIndex(10);
+                var fiSpace = singleView.FindFromCharIndex(9);
+                int charWidthS = singleView.FindFromCharIndex(11).Location.X - fiS.Location.X;
+                Assert.True(charWidthS >= 7 && charWidthS <= 8, $"Consolas 10pt char width should be 7-8px, got {charWidthS}");
+
+                // FindFromPoint directly at the left edge of 's' should select char 10
+                var hitTestS = singleView.FindFromPoint(new Point(fiS.Location.X + 1, fiS.Location.Y + 2));
+                Assert.Equal(10, hitTestS.IndexOfCharInLine);
+            }
+        }
+
+        [Fact]
+        public void NoWrapTextView_TrailingNewlines_ClampedAccurately()
+        {
+            using (var tbx = new ST.Library.UI.STTextBox.STTextBox())
+            using (var gdipRender = new STTextBoxGDIPRender())
+            {
+                tbx.SetBounds(0, 0, 500, 100);
+                tbx.SetTextBoxRender(gdipRender);
+                var noWrapView = new NoWrapTextView();
+                tbx.SetTextView(noWrapView);
+                tbx.Font = new Font("Consolas", 10f);
+
+                string line = "hello world\r\n";
+                tbx.SetText(line);
+
+                // Clicking far to the right of line 0 should place caret before \r\n (index 11)
+                var fi = noWrapView.FindFromPoint(new Point(450, noWrapView.TextRectangle.Y + 5));
+                Assert.Equal(0, fi.IndexOfLine);
+                Assert.Equal("hello world".Length, fi.IndexOfCharInLine);
+            }
+        }
     }
 }
