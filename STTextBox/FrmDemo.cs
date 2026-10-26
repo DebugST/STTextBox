@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -25,6 +25,7 @@ namespace STTextBoxTest
             btn_style.Click += (s, e) => new Demos.FrmStyle().Show();
             btn_invisablechar.Click += (s, e) => new Demos.FrmInvisableChar().Show();
             btn_about_code.Click += (s, e) => new Demos.FrmCore().Show();
+            btn_quick_selection.Click += (s, e) => new Demos.FrmQuickSelectionDemo().Show();
             btn_about.Click += (s, e) => new Demos.FrmAbout().Show();
         }
     }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -51,30 +51,30 @@ namespace ST.Library.UI.STTextBox
             public int Type;
         }
 
-        public List<string> Split(string strText) {
+        public virtual List<string> Split(string strText) {
             List<string> lst_result = new List<string>(strText.Length);
             this.SplitPrivate(strText, lst_result, 0, null, null);
             return lst_result;
         }
 
-        public int GetCount(string strText) {
+        public virtual int GetCount(string strText) {
             int nLen = this.SplitPrivate(strText, null, 0, null, null);
             return nLen;
         }
 
-        public void Each(string strText, EachVoidCallBack cb) {
+        public virtual void Each(string strText, EachVoidCallBack cb) {
             this.SplitPrivate(strText, null, 0, cb, null);
         }
 
-        public void Each(string strText, int nIndex, EachVoidCallBack cb) {
+        public virtual void Each(string strText, int nIndex, EachVoidCallBack cb) {
             this.SplitPrivate(strText, null, nIndex, cb, null);
         }
 
-        public void Each(string strText, EachBoolCallBack cb) {
+        public virtual void Each(string strText, EachBoolCallBack cb) {
             this.SplitPrivate(strText, null, 0, null, cb);
         }
 
-        public void Each(string strText, int nIndex, EachBoolCallBack cb) {
+        public virtual void Each(string strText, int nIndex, EachBoolCallBack cb) {
             this.SplitPrivate(strText, null, nIndex, null, cb);
         }
 

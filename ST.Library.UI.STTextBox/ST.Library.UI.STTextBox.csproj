@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -47,8 +47,10 @@
     <Compile Include="Implementation\StyleMonitor\LinkStyleMonitor.cs" />
     <Compile Include="Implementation\StyleMonitor\SelectionStyleMonitor.cs" />
     <Compile Include="Implementation\STTextBoxGDIPRender.cs" />
+    <Compile Include="Implementation\STTextBoxGDIRender.cs" />
     <Compile Include="Implementation\TextHistory.cs" />
     <Compile Include="Implementation\TextView\NoWrapTextView.cs" />
+    <Compile Include="Implementation\TextView\QuickTextView.cs" />
     <Compile Include="Implementation\TextStyleMonitor.cs" />
     <Compile Include="Implementation\TextView\SingleTextView.cs" />
     <Compile Include="Implementation\TextView\TextView.cs" />
@@ -85,6 +87,12 @@
     <Compile Include="TextManager\TextLine.cs" />
     <Compile Include="TextManager\TextManager.cs" />
     <Compile Include="Win32.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\External\GraphemeSplitterNET\GraphemeSplitterNET\GraphemeSplitterNET.csproj">
+      <Project>{E1B9A5DC-B135-42B3-938F-BC66C96A2651}</Project>
+      <Name>GraphemeSplitterNET</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

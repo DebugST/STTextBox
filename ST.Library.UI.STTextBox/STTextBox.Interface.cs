@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -15,6 +15,8 @@ namespace ST.Library.UI.STTextBox
 
             public int FontHeight { get { return this.ITextBoxRender.GetFontHeight(); } }
             public int LineHeight { get { return this.ITextBoxRender.GetFontHeight() + this.TextBox.GetIntYSize(this.TextBox.LineSpacing); } }
+            public bool IsMonospaced { get { return this.ITextBoxRender.IsMonospaced; } }
+            public float CharWidthFloat { get { return this.ITextBoxRender.CharWidthFloat; } }
             public ITextBoundary IGraphemeSplitter { get; internal set; }
             public ITextBoundary IWordSplitter { get; internal set; }
             public ISTTextBoxRender ITextBoxRender { get; internal set; }
@@ -94,6 +96,12 @@ namespace ST.Library.UI.STTextBox
                 old.UnbindControl();
                 render.BindControl(this.TextBox);
                 this.ITextBoxRender = render;
+                if (this.ITextView != null) {
+                    this.ITextView.Init(this);
+                    this.ITextView.OnCalcTextRectangle();
+                    this.ITextView.OnCalcScroll(this.Scroll);
+                }
+                this.TextBox.Invalidate();
                 return old;
             }
 
@@ -118,6 +126,47 @@ namespace ST.Library.UI.STTextBox
                 return this.IEmojiRender.IsEmoji(strChar);
             }
 
+            public bool TryGetEmoji(string text, int index, int maxLen, out int emojiLength, out string emojiStr) {
+                emojiLength = 0;
+                emojiStr = null;
+                if (this.IEmojiRender == null || index >= maxLen || string.IsNullOrEmpty(text)) return false;
+
+                // 1. Try grapheme cluster first (handles ZWJ sequences, skin tones, flags, surrogate pairs, BMP emojis)
+                if (this.IGraphemeSplitter is GraphemeSplitter gs) {
+                    int next = gs.NextBreak(text, index);
+                    if (next > index && next <= maxLen) {
+                        int len = next - index;
+                        string str = text.Substring(index, len);
+                        if (this.IsEmoji(str)) {
+                            emojiLength = len;
+                            emojiStr = str;
+                            return true;
+                        }
+                    }
+                }
+
+                // 2. Fallback: try surrogate pair (length 2) if high surrogate
+                char ch = text[index];
+                if (char.IsHighSurrogate(ch) && index + 1 < maxLen && char.IsLowSurrogate(text[index + 1])) {
+                    string str = text.Substring(index, 2);
+                    if (this.IsEmoji(str)) {
+                        emojiLength = 2;
+                        emojiStr = str;
+                        return true;
+                    }
+                }
+
+                // 3. Fallback: try single character (length 1, for BMP emojis like ☺, ⚽, ⚡)
+                string singleStr = text.Substring(index, 1);
+                if (this.IsEmoji(singleStr)) {
+                    emojiLength = 1;
+                    emojiStr = singleStr;
+                    return true;
+                }
+
+                return false;
+            }
+
             public int GetStringWidth(string strText, TextStyle textStyle, int nLeftWidth) {
                 if (this.IsEmoji(strText)) {
                     return this.FontHeight;
@@ -126,6 +175,16 @@ namespace ST.Library.UI.STTextBox
                     strText = strText.Substring(0, strText.Length - 1);
                 }
                 return this.ITextBoxRender.GetStringWidth(strText, textStyle, nLeftWidth) + this.TextBox.GetIntXSize(this.TextBox.CharSpacing);
+            }
+
+            public float GetStringWidthFloat(string strText, TextStyle textStyle, float fLeftWidth) {
+                if (this.IsEmoji(strText)) {
+                    return (float)this.FontHeight;
+                }
+                if (strText.Length > 1 && strText[strText.Length - 1] >= '\uFE00' && strText[strText.Length - 1] <= '\uFE0F') {
+                    strText = strText.Substring(0, strText.Length - 1);
+                }
+                return this.ITextBoxRender.GetStringWidthFloat(strText, textStyle, fLeftWidth) + (float)this.TextBox.GetIntXSize(this.TextBox.CharSpacing);
             }
 
             public TextStyle GetStyleFromCharIndex(int nIndex) {
@@ -223,6 +282,8 @@ namespace ST.Library.UI.STTextBox
             var old = m_core.ITextView;
             m_core.ITextView = textView;
             textView.Init(m_core);
+            textView.OnCalcTextRectangle();
+            textView.OnCalcScroll(m_core.Scroll);
             return old;
         }
 

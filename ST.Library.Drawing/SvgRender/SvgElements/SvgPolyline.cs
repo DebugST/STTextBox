@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -62,8 +62,11 @@ namespace ST.Library.Drawing.SvgRender
             var ms = m_reg_num.Matches(strPoints);
             PointF[] ptFs = new PointF[ms.Count / 2];
             for (int i = 0, j = 0; i < ms.Count; i += 2, j++) {
-                ptFs[j].X = float.Parse(ms[i].Value);
-                ptFs[j].Y = float.Parse(ms[i + 1].Value);
+                float x, y;
+                float.TryParse(ms[i].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out x);
+                float.TryParse(ms[i + 1].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out y);
+                ptFs[j].X = x;
+                ptFs[j].Y = y;
             }
             return ptFs;
         }

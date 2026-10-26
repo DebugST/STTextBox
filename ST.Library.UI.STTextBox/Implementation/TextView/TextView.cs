@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -54,8 +54,9 @@ namespace ST.Library.UI.STTextBox
 
         public abstract int GetCurrentCharOffset();
 
-        public void Init(STTextBox.Core textBoxCore) {
+        public virtual void Init(STTextBox.Core textBoxCore) {
             this.Core = textBoxCore;
+            this.OnCalcTextRectangle();
             this.OnInitAllText();
         }
 
@@ -145,14 +146,14 @@ namespace ST.Library.UI.STTextBox
         public Point ControlToView(Point pt) {
             var c = this.Core;
             pt.X = pt.X - this.TextRectangle.X + this.Core.Scroll.XOffset;
-            pt.Y = pt.Y - c.TextBox.GetIntYSize(c.ViewRectangle.Y) + c.Scroll.YValue * c.LineHeight;
+            pt.Y = pt.Y - this.TextRectangle.Y + c.Scroll.YValue * c.LineHeight;
             return pt;
         }
 
         public Point ViewToControl(Point pt) {
             var c = this.Core;
             pt.X = pt.X - c.Scroll.XOffset + this.TextRectangle.X;
-            pt.Y = pt.Y - c.Scroll.YValue * c.LineHeight + c.TextBox.GetIntYSize(c.ViewRectangle.Y);
+            pt.Y = pt.Y - c.Scroll.YValue * c.LineHeight + this.TextRectangle.Y;
             return pt;
         }
 

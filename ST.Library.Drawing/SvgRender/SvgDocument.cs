@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -255,7 +255,11 @@ namespace ST.Library.Drawing.SvgRender
         protected internal override void Dispose() { }
 
         private float _F(string strValue) {
-            return float.Parse(strValue);
+            float val;
+            if (float.TryParse(strValue, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out val)) {
+                return val;
+            }
+            return 0;
         }
 
         protected override void OnDrawStroke(Graphics g, GraphicsPath gp) { }

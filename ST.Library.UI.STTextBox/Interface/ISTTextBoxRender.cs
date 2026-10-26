@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -83,11 +83,27 @@ namespace ST.Library.UI.STTextBox
         /// <returns>Width</returns>
         int GetStringWidth(string strText, TextStyle style, int nLeftWidth);
 
+        /// <summary>
+        /// Gets whether the current active font is monospaced.
+        /// </summary>
+        bool IsMonospaced { get; }
+
+        /// <summary>
+        /// Gets the exact floating-point advance width of a character in the active font.
+        /// </summary>
+        float CharWidthFloat { get; }
+
+        /// <summary>
+        /// Get the exact floating-point string width.
+        /// </summary>
+        float GetStringWidthFloat(string strText, TextStyle style, float fLeftWidth);
+
         void SetClip(Rectangle rect);
         void ResetClip();
         void DrawImage(Image img, Rectangle rect);
         void DrawString(string strText, Font ft, Color color, Rectangle rect, StringFormat sf);
         void DrawString(string strText, TextStyle style, Rectangle rect);
+        void DrawString(string strText, TextStyle style, RectangleF rect);
         void FillRectangle(Color backColor, Rectangle rect);
         void FillRectangle(Color backColor, int nX, int nY, int nWidth, int nHeight);
     }

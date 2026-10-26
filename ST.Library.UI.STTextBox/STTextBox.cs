@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -61,7 +61,7 @@ namespace ST.Library.UI.STTextBox
             }
         }
 
-        private Color _SelectionColor = Color.FromArgb(125, Color.DarkGray);
+        private Color _SelectionColor = Color.FromArgb(0, 120, 215);
 
         public Color SelectionColor {
             get { return _SelectionColor; }
@@ -76,11 +76,62 @@ namespace ST.Library.UI.STTextBox
             }
         }
 
+        private Color _SelectedTextColor = Color.White;
+
+        public Color SelectedTextColor {
+            get { return _SelectedTextColor; }
+            set {
+                if (value == _SelectedTextColor) {
+                    return;
+                }
+                _SelectedTextColor = value;
+                if (!m_core.Selection.IsEmptySelection) {
+                    this.Invalidate();
+                }
+            }
+        }
+
         private bool _AllowScrollBar = true;
 
         public bool AllowScrollBar {
             get { return _AllowScrollBar; }
             set { _AllowScrollBar = value; }
+        }
+
+        [Browsable(true)]
+        [Category("Behavior")]
+        [DefaultValue(false)]
+        [Description("Gets or sets whether text wraps to the next line.")]
+        public bool WordWrap {
+            get {
+                return m_core != null && m_core.ITextView is WrapTextView;
+            }
+            set {
+                if (m_core == null || value == (m_core.ITextView is WrapTextView)) return;
+                if (value) {
+                    this.SetTextView(new WrapTextView(WrapTextView.Method.Word, WrapTextView.Alignment.Left));
+                } else {
+                    this.SetTextView(new QuickTextView());
+                }
+            }
+        }
+
+        [Browsable(true)]
+        [Category("Appearance")]
+        [DefaultValue(WrapTextView.Alignment.Left)]
+        [Description("Gets or sets text alignment when wrapped view is used.")]
+        public WrapTextView.Alignment TextAlignment {
+            get {
+                var wrap = (m_core != null) ? m_core.ITextView as WrapTextView : null;
+                return wrap != null ? wrap.WrapAlignment : WrapTextView.Alignment.Left;
+            }
+            set {
+                var wrap = (m_core != null) ? m_core.ITextView as WrapTextView : null;
+                if (wrap != null) {
+                    wrap.SetWrap(wrap.WrapMethod, value);
+                    this.Invalidate();
+                }
+            }
         }
 
         private Color _ScrollbarBackColor = Color.FromArgb(40, Color.Gray);
@@ -242,6 +293,18 @@ namespace ST.Library.UI.STTextBox
             m_core.ITextView.OnCalcScroll(m_core.Scroll);
         }
 
+        protected override void OnFontChanged(EventArgs e) {
+            base.OnFontChanged(e);
+            if (m_core != null && m_core.ITextView != null) {
+                m_core.ITextView.Init(m_core);
+                m_core.ITextView.OnCalcTextRectangle();
+                if (m_core.Scroll != null) {
+                    m_core.ITextView.OnCalcScroll(m_core.Scroll);
+                }
+                this.Invalidate();
+            }
+        }
+
         protected override void OnGotFocus(EventArgs e) {
             base.OnGotFocus(e);
             Win32.CreateCaret(this.Handle, IntPtr.Zero, this.GetIntXSize(1), m_core.LineHeight);
@@ -285,6 +348,18 @@ namespace ST.Library.UI.STTextBox
 
         public TextHistoryRecord SetText(int nIndex, int nLen, string strText) {
             return m_core.TextManager.SetText(nIndex, nLen, strText);
+        }
+
+        public void Select(int nStart, int nLength) {
+            if (nStart < 0) nStart = 0;
+            if (nLength < 0) nLength = 0;
+            int nMax = m_core.TextManager.TextLength;
+            if (nStart > nMax) nStart = nMax;
+            if (nStart + nLength > nMax) nLength = nMax - nStart;
+            m_core.Selection.SetSelection(nStart, nStart + nLength);
+            m_core.Caret.IndexOfChar = m_core.Selection.EndIndex;
+            m_core.ITextView.SetCaretPostion(m_core.Caret.IndexOfChar);
+            this.Invalidate();
         }
 
         public void SelectAll() {
