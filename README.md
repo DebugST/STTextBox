@@ -1,4 +1,4 @@
-[![.Net35](https://img.shields.io/badge/DotNet-3.5-blue)](https://www.microsoft.com/zh-cn/download/details.aspx?id=25150)
+[![.Net40](https://img.shields.io/badge/DotNet-4.0-blue)](https://www.microsoft.com/download/details.aspx?id=17851)
 [![LICENSE](https://img.shields.io/badge/License-MIT-green)](https://github.com/DebugST/STNodeEditor/blob/main/LICENSE)
 
 [简体中文](./README.CN.md)
@@ -8,12 +8,19 @@ STTextBox is a pure GDI-drawn WinForm control, which can support transparent col
 
 STTextBox is a WinForm control drawn by me and my friend [tpbeldie](https://github.com/tpbeldie) using GDI.
 
-We adopt the MIT open source license, and the code is built with .Net3.5 + vs2010, 
-so it is compatible with almost all VS versions.
-Two open source projects were also generated during the design process:
+We adopt the MIT open source license. The code targets .NET Framework 4.0 and builds with VS2017 or newer.
+Clone with `git clone --recursive`, or run `git submodule update --init` after cloning.
+
+Need .NET 3.5 or VS2010? Use the [net35](https://github.com/DebugST/STTextBox/tree/net35) branch,
+which keeps the original code from before the performance rewrite.
+
+The fast selection highlighting is based on tpbeldie's earlier QuickTextboxPrototype project.
+
+Three open source projects were also generated during the design process:
 
 [emoji-svg-render](https://github.com/DebugST/emoji-svg-render), 
-[STGraphemeSplitter](https://github.com/DebugST/STGraphemeSplitter)
+[STGraphemeSplitter](https://github.com/DebugST/STGraphemeSplitter), 
+[GraphemeSplitterNET](https://github.com/tpbeldie/GraphemeSplitterNET)
     
 Because of our limited capabilities, many functions are not well implemented, 
 so we modified the core functions into independent interfaces,
