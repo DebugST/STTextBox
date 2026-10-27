@@ -1,14 +1,21 @@
-[![.Net35](https://img.shields.io/badge/DotNet-3.5-blue)](https://www.microsoft.com/zh-cn/download/details.aspx?id=25150)
+[![.Net40](https://img.shields.io/badge/DotNet-4.0-blue)](https://www.microsoft.com/zh-cn/download/details.aspx?id=17851)
 [![LICENSE](https://img.shields.io/badge/License-MIT-green)](https://github.com/DebugST/STNodeEditor/blob/main/LICENSE)
 
 # STTextBox
 `STTextBox`是我和我的朋友[netero](https://github.com/0x54164)使用`GDI`构建的一个`WinForm`控件，可以支持`Emoji`
 
-我们采用MIT开源协议，使用`.Net3.5` + `vs2010`构建的项目，所以几乎可以兼容任何VS版本，
-在开发的过程中我们还衍生出两个额外的开源项目：
+我们采用MIT开源协议，项目基于`.NET Framework 4.0`，需要使用`VS2017`或更新版本构建。
+克隆时请使用`git clone --recursive`，或在克隆后执行`git submodule update --init`。
+
+需要`.Net3.5`或`vs2010`？请使用[net35](https://github.com/DebugST/STTextBox/tree/net35)分支，其中保留了性能重写之前的原始代码。
+
+快速选区高亮的实现基于tpbeldie早期的QuickTextboxPrototype项目。
+
+在开发的过程中我们还衍生出三个额外的开源项目：
 
 [emoji-svg-render](https://github.com/DebugST/emoji-svg-render), 
-[STGraphemeSplitter](https://github.com/DebugST/STGraphemeSplitter)
+[STGraphemeSplitter](https://github.com/DebugST/STGraphemeSplitter), 
+[GraphemeSplitterNET](https://github.com/tpbeldie/GraphemeSplitterNET)
 
 因为能力有限，很多功能我们都无法很好的实现，所以将一些有代表性的功能独立成了接口。
 如果有能力且愿意去修改它们的开发者可以直接继承接口实现，不用在项目中到处找代码了。
